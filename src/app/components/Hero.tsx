@@ -86,6 +86,7 @@ export default function Hero() {
             </div>
           ))}
         </Slider>
+      
       </div>
     </section>
   );

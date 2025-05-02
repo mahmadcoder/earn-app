@@ -6,12 +6,15 @@ import Account from './components/Account';
 
 
 import Detail from './components/Detail';
+import About from './about/page';
 
 
 export default function Home() {
   return (
     <div>
+   
      <Hero />
+   
       <MoreInfo/>
       <Account/>
       <Detail />
