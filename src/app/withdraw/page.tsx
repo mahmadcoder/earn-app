@@ -1,59 +1,84 @@
 'use client';
 import { useState } from 'react';
 
-export default function WithdrawButton() {
+export default function WithdrawPage() {
+  const [address, setAddress] = useState('');
+  const [amount, setAmount] = useState('');
+  const [asset, setAsset] = useState('BTC');
   const [loading, setLoading] = useState(false);
-  const [binanceAddress, setBinanceAddress] = useState("");
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
 
   const handleWithdraw = async () => {
-    if (!binanceAddress) {
-      alert("Please enter your Binance address.");
-      return;
-    }
-
     setLoading(true);
+    setMessage('');
+    setError('');
+
     try {
-      const response = await fetch('/api/cryptomus/withdraw', {
+      const res = await fetch('/api/withdraw', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          amount: 10, // The amount user is withdrawing (USD)
-          userBinanceAddress: binanceAddress,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address, amount, asset }),
       });
 
-      if (!response.ok) {
-        throw new Error(`Error: ${response.statusText}`);
-      }
+      const data = await res.json();
 
-      const data = await response.json();
-      alert("Withdrawal successful!");
-    } catch (error) {
-      console.error('Error during withdrawal:', error.message);
-      alert("Error during withdrawal: " + error.message);
+      if (!res.ok) throw new Error(data.error || 'Withdraw failed');
+      setMessage(data.message || 'Withdrawal successful!');
+      setAddress('');
+      setAmount('');
+    } catch (err: any) {
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div>
-      <input
-        type="text"
-        placeholder="Enter Binance Address"
-        value={binanceAddress}
-        onChange={(e) => setBinanceAddress(e.target.value)}
-        className="border p-2 rounded mb-4 w-full"
-      />
-      <button
-        onClick={handleWithdraw}
-        disabled={loading}
-        className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded"
-      >
-        {loading ? 'Processing...' : 'Withdraw to Binance'}
-      </button>
+    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-8">
+      <h1 className="text-2xl font-bold mb-6">Withdraw Funds</h1>
+
+      <div className="bg-gray-800 p-6 rounded w-full max-w-md">
+        <label className="block mb-2 text-sm font-medium">Asset</label>
+        <select
+          value={asset}
+          onChange={e => setAsset(e.target.value)}
+          className="w-full mb-4 p-2 rounded bg-gray-700 text-white"
+        >
+          <option value="BTC">BTC</option>
+          <option value="ETH">ETH</option>
+          <option value="USDT">USDT</option>
+        </select>
+
+        <label className="block mb-2 text-sm font-medium">Recipient Address</label>
+        <input
+          type="text"
+          value={address}
+          onChange={e => setAddress(e.target.value)}
+          className="w-full mb-4 p-2 rounded bg-gray-700 text-white"
+          placeholder="Enter wallet address"
+        />
+
+        <label className="block mb-2 text-sm font-medium">Amount</label>
+        <input
+          type="number"
+          value={amount}
+          onChange={e => setAmount(e.target.value)}
+          className="w-full mb-4 p-2 rounded bg-gray-700 text-white"
+          placeholder="Enter amount"
+        />
+
+        <button
+          onClick={handleWithdraw}
+          disabled={loading}
+          className="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded disabled:opacity-50"
+        >
+          {loading ? 'Processing...' : 'Withdraw'}
+        </button>
+
+        {message && <p className="text-green-400 mt-4">{message}</p>}
+        {error && <p className="text-red-400 mt-4">{error}</p>}
+      </div>
     </div>
   );
 }

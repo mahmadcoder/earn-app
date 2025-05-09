@@ -17,7 +17,7 @@ const RegistrationForm = () => {
   const router = useRouter();
 
   // Backend URL for local testing
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://watch-and-earn-production.up.railway.app";
+  const API_URL = process.env.NEXT_PUBLIC_API_URL  ;
 
   // Password Validation Function
   const validatePassword = (password: string): string => {

@@ -7,9 +7,14 @@ const nextConfig: NextConfig = {
 
   async rewrites() {
     return [
+      // Proxy only login and register requests to backend
       {
-        source: "/:path*", // ✅ Frontend API Route
-        destination: "https://watch-and-earn-production.up.railway.app/:path*", // ✅ Backend ka Railway URL
+        source: '/login',
+        destination: 'http://localhost:3001/login',
+      },
+      {
+        source: '/register',
+        destination: 'http://localhost:3001/register',
       },
     ];
   },
