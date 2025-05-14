@@ -1,9 +1,9 @@
-'use client'; 
 'use client';
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Head from 'next/head';
+import { useAuth } from '@/context/AuthContext';
 
 const RegistrationForm = () => {
   const [name, setName] = useState('');
@@ -11,13 +11,12 @@ const RegistrationForm = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState('');
-  const [loading, setLoading] = useState(false);
   const [passwordError, setPasswordError] = useState('');
   const [registered, setRegistered] = useState(false);
   const router = useRouter();
-
-  // Backend URL for local testing
-  const API_URL = process.env.NEXT_PUBLIC_API_URL  ;
+  
+  // Use authentication context
+  const { register, loading, error } = useAuth();
 
   // Password Validation Function
   const validatePassword = (password: string): string => {
@@ -32,37 +31,23 @@ const RegistrationForm = () => {
   // Form Submit Handler
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setMessage('');
     setPasswordError('');
 
     const passwordValidationError = validatePassword(password);
     if (passwordValidationError) {
       setPasswordError(passwordValidationError);
-      setLoading(false);
       return;
     }
 
     try {
-      const response = await fetch(`${API_URL}/register`, { 
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ name, email, password }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || "Registration failed.");
-      }
-
+      // Use the register function from auth context
+      await register(name, email, password);
+      
       setMessage("Registration successful! Click below to go to login.");
       setRegistered(true);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Registration failed. Please try again.");
-    } finally {
-      setLoading(false);
     }
   };
   

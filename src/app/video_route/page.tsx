@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import ReactPlayer from 'react-player';
+import ProtectedRoute from '../components/ProtectedRoute';
 
 const Videos = () => {
   const videoUrls = [
@@ -108,4 +109,13 @@ const Videos = () => {
   );
 };
 
-export default Videos;
+// Wrap the component with ProtectedRoute to ensure only authenticated users can access it
+const VideoPage = () => {
+  return (
+    <ProtectedRoute>
+      <Videos />
+    </ProtectedRoute>
+  );
+};
+
+export default VideoPage;

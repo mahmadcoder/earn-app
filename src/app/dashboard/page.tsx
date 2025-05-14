@@ -10,6 +10,7 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { MessageSquare, Send, Users } from "lucide-react";
+import ProtectedRoute from "../components/ProtectedRoute";
 
 interface Message {
   id: string;
@@ -159,4 +160,13 @@ const ChatDashboard = () => {
   );
 };
 
-export default ChatDashboard;
+// Wrap the component with ProtectedRoute to ensure only admin users can access it
+const DashboardPage = () => {
+  return (
+    <ProtectedRoute adminOnly={true}>
+      <ChatDashboard />
+    </ProtectedRoute>
+  );
+};
+
+export default DashboardPage;

@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import axios from "axios";
+import { useAuth } from "@/context/AuthContext";
 
 const LoginForm = () => {
   const [formData, setFormData] = useState({
@@ -12,8 +12,8 @@ const LoginForm = () => {
 
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
   const router = useRouter(); // Navigation hook
+  const { login, loading, error } = useAuth(); // Use authentication context
 
   // Handle input changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -27,45 +27,29 @@ const LoginForm = () => {
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setLoading(true);
     setMessage("");
 
     try {
-      // Make API request
-      const response = await axios.post("http://localhost:3001/login", {
-        email: formData.email,
-        password: formData.password,
-      });
+      // Use the login function from auth context
+      await login(formData.email, formData.password);
+      
+      setMessage("Login successful!");
 
-      if (response.status === 200) {
-        setMessage("Login successful!");
-        console.log(response.data);
-
-        // Store token if available
-        if (response.data.token) {
-          localStorage.setItem("authToken", response.data.token);
-        }
-
-        // Redirect based on email
-        if (formData.email === "admin@gmail.com") {
-          setTimeout(() => {
-            router.push("/dashboard"); // Admin goes to dashboard
-          }, 1000);
-        } else {
-          setTimeout(() => {
-            router.push("/video_route"); // Regular users
-          }, 1000);
-        }
+      // Redirect based on email
+      if (formData.email === "admin@gmail.com") {
+        setTimeout(() => {
+          router.push("/dashboard"); // Admin goes to dashboard
+        }, 1000);
       } else {
-        setMessage("Unexpected error occurred. Please try again.");
+        setTimeout(() => {
+          router.push("/video_route"); // Regular users
+        }, 1000);
       }
     } catch (error: any) {
       console.error(error);
       setMessage(
         error.response?.data?.message || "Login failed. Please check your email and password."
       );
-    } finally {
-      setLoading(false);
     }
   };
 
