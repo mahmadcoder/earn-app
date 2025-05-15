@@ -173,8 +173,6 @@ function WithdrawPage() {
                 onChange={e => setAsset(e.target.value)}
                 className="w-full mb-4 p-3 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="BTC">Bitcoin (BTC)</option>
-                <option value="ETH">Ethereum (ETH)</option>
                 <option value="USDT">Tether (USDT)</option>
               </select>
 

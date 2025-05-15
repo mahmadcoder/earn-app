@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { CheckCircle, Clock, AlertCircle, ArrowRight, History, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { CheckCircle, Clock, AlertCircle, Upload, History, Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import ProtectedRoute from "@/app/components/ProtectedRoute";
 
@@ -15,39 +15,47 @@ export default function DepositPageWrapper() {
 
 function DepositPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { user } = useAuth();
   
   const [selectedCoin, setSelectedCoin] = useState("USDT");
   const [amount, setAmount] = useState("");
+  const [transactionHash, setTransactionHash] = useState("");
+  const [paymentProof, setPaymentProof] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
   const [depositHistory, setDepositHistory] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("deposit"); // deposit or history
-  
-  // Check for success message from URL params
-  const showSuccess = searchParams.get("success") === "true";
-  
+  const [activeTab, setActiveTab] = useState("deposit");
+  const [stats, setStats] = useState<any>({
+    total: 0,
+    pending: 0,
+    completed: 0,
+    rejected: 0,
+    totalAmount: 0
+  });
+
   const walletAddresses = {
-    BTC: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
-    ETH: "0x1234567890abcdef1234567890abcdef12345678",
-    USDT: "TJuZCvYANND2emRa4ssrWqpZswPFUaJVWQ", // Using the address from staking page
+    USDT: "TJuZCvYANND2emRa4ssrWqpZswPFUaJVWQ",
   };
 
   // Fetch deposit history
-  useEffect(() => {
-    if (user?.id) {
-      fetchDepositHistory();
-    }
-  }, [user]);
-  
   const fetchDepositHistory = async () => {
+    if (!user?.id) return;
+    
     setHistoryLoading(true);
     try {
       const response = await fetch(`/api/deposits/history?userId=${user?.id}`);
       if (response.ok) {
         const data = await response.json();
         setDepositHistory(data.deposits || []);
+        setStats(data.stats || {
+          total: 0,
+          pending: 0,
+          completed: 0,
+          rejected: 0,
+          totalAmount: 0
+        });
       }
     } catch (error) {
       console.error("Failed to fetch deposit history:", error);
@@ -56,16 +64,96 @@ function DepositPage() {
     }
   };
 
-  const handleDeposit = () => {
+  useEffect(() => {
+    if (user?.id) {
+      fetchDepositHistory();
+    }
+  }, [user]);
+
+  const handleSubmitDeposit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
     if (!amount || parseFloat(amount) <= 0) {
-      alert("Please enter a valid amount");
+      setError("Please enter a valid amount");
+      return;
+    }
+
+    if (!transactionHash) {
+      setError("Please enter the transaction hash");
+      return;
+    }
+
+    if (!paymentProof) {
+      setError("Please upload payment screenshot");
       return;
     }
     
     setLoading(true);
-    
-    // Redirect to confirmation page with deposit details
-    router.push(`/deposit/confirm?amount=${amount}&currency=${selectedCoin}`);
+    setMessage("");
+    setError("");
+
+    try {
+      // First upload the payment proof
+      const formData = new FormData();
+      formData.append('file', paymentProof);
+      
+      const uploadRes = await fetch('/api/uploads', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!uploadRes.ok) {
+        throw new Error('Failed to upload payment proof');
+      }
+      
+      const { fileUrl } = await uploadRes.json();
+
+      // Then submit the deposit confirmation
+      const res = await fetch('/api/deposits/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactionHash,
+          amount,
+          currency: selectedCoin,
+          paymentProofUrl: fileUrl,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.message || 'Deposit confirmation failed');
+      
+      setMessage(data.message || 'Deposit confirmation submitted successfully!');
+      setTransactionHash("");
+      setAmount("");
+      setPaymentProof(null);
+      
+      // Refresh deposit history
+      fetchDepositHistory();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      // Check file type
+      if (!file.type.startsWith('image/')) {
+        setError('Please upload an image file');
+        return;
+      }
+      // Check file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setError('File size should be less than 5MB');
+        return;
+      }
+      setPaymentProof(file);
+      setError('');
+    }
   };
   
   // Format date for display
@@ -140,52 +228,94 @@ function DepositPage() {
             <div className="bg-gray-800 rounded-2xl shadow-xl p-6">
               <h2 className="text-xl font-semibold mb-4">Deposit Details</h2>
               
-              <label className="block mb-2 font-medium text-sm">Select Coin</label>
-              <select
-                value={selectedCoin}
-                onChange={(e) => setSelectedCoin(e.target.value)}
-                className="w-full p-3 rounded bg-gray-700 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="BTC">Bitcoin (BTC)</option>
-                <option value="ETH">Ethereum (ETH)</option>
-                <option value="USDT">Tether (USDT)</option>
-              </select>
+              <form onSubmit={handleSubmitDeposit}>
+                <label className="block mb-2 font-medium text-sm">Select Coin</label>
+                <select
+                  value={selectedCoin}
+                  onChange={(e) => setSelectedCoin(e.target.value)}
+                  className="w-full p-3 rounded bg-gray-700 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="USDT">Tether (USDT)</option>
+                </select>
 
-              <label className="block mb-2 font-medium text-sm">Deposit Amount</label>
-              <input
-                type="number"
-                placeholder="Enter amount"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="w-full p-3 rounded bg-gray-700 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              
-              {showSuccess && (
-                <div className="mb-4 p-3 bg-green-900/50 border border-green-700 rounded-lg">
-                  <div className="flex items-center text-green-400 font-medium">
-                    <CheckCircle className="mr-2" />
-                    Your deposit has been submitted for verification!
-                  </div>
+                <label className="block mb-2 font-medium text-sm">Deposit Amount</label>
+                <input
+                  type="number"
+                  placeholder="Enter amount"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="w-full p-3 rounded bg-gray-700 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+
+                <label className="block mb-2 font-medium text-sm">Transaction Hash</label>
+                <input
+                  type="text"
+                  value={transactionHash}
+                  onChange={(e) => setTransactionHash(e.target.value)}
+                  placeholder="Enter transaction hash/ID"
+                  className="w-full p-3 rounded bg-gray-700 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-400 mt-1 mb-4">
+                  The transaction hash/ID from your wallet or exchange
+                </p>
+
+                <label className="block mb-2 font-medium text-sm">Payment Screenshot</label>
+                <div className="relative mb-4">
+                  <input
+                    type="file"
+                    onChange={handleFileChange}
+                    accept="image/*"
+                    className="hidden"
+                    id="payment-proof"
+                  />
+                  <label
+                    htmlFor="payment-proof"
+                    className={`w-full p-3 rounded flex items-center justify-center border-2 border-dashed cursor-pointer
+                      ${paymentProof ? 'border-green-500 bg-green-900/20' : 'border-gray-600 hover:border-blue-500 bg-gray-700'}`}
+                  >
+                    <Upload className={`w-5 h-5 mr-2 ${paymentProof ? 'text-green-500' : 'text-gray-400'}`} />
+                    <span className={paymentProof ? 'text-green-500' : 'text-gray-400'}>
+                      {paymentProof ? paymentProof.name : 'Upload payment screenshot'}
+                    </span>
+                  </label>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Upload a screenshot of your transaction (Max size: 5MB)
+                  </p>
                 </div>
-              )}
-              
-              <button
-                onClick={handleDeposit}
-                disabled={loading}
-                className={`w-full ${loading ? "bg-blue-800" : "bg-blue-600 hover:bg-blue-700"} text-white py-3 rounded font-semibold flex items-center justify-center`}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="animate-spin mr-2 h-5 w-5" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    Continue to Confirmation
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </>
+
+                {message && (
+                  <div className="mb-4 p-3 bg-green-900/50 border border-green-700 rounded-lg">
+                    <div className="flex items-center text-green-400 font-medium">
+                      <CheckCircle className="mr-2" />
+                      {message}
+                    </div>
+                  </div>
                 )}
-              </button>
+                
+                {error && (
+                  <div className="mb-4 p-3 bg-red-900/50 border border-red-700 rounded-lg">
+                    <div className="flex items-center text-red-400 font-medium">
+                      <AlertCircle className="mr-2" />
+                      {error}
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className={`w-full ${loading ? "bg-blue-800" : "bg-blue-600 hover:bg-blue-700"} text-white py-3 rounded font-semibold flex items-center justify-center`}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="animate-spin mr-2 h-5 w-5" />
+                      Processing...
+                    </>
+                  ) : (
+                    'Submit Deposit'
+                  )}
+                </button>
+              </form>
             </div>
             
             <div className="bg-gray-800 rounded-2xl shadow-xl p-6">
@@ -203,14 +333,37 @@ function DepositPage() {
                   className="mx-auto rounded"
                 />
               </div>
+
+              {/* Deposit Stats */}
+              <div className="mt-6">
+                <h3 className="text-lg font-medium mb-4">Deposit Statistics</h3>
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="bg-gray-700 p-4 rounded-lg">
+                    <p className="text-gray-400 text-sm">Total Deposits</p>
+                    <p className="text-2xl font-bold">{stats.total}</p>
+                  </div>
+                  <div className="bg-gray-700 p-4 rounded-lg">
+                    <p className="text-gray-400 text-sm">Total Amount</p>
+                    <p className="text-2xl font-bold">{stats.totalAmount.toFixed(2)}</p>
+                  </div>
+                  <div className="bg-gray-700 p-4 rounded-lg">
+                    <p className="text-gray-400 text-sm">Pending</p>
+                    <p className="text-2xl font-bold text-yellow-400">{stats.pending}</p>
+                  </div>
+                  <div className="bg-gray-700 p-4 rounded-lg">
+                    <p className="text-gray-400 text-sm">Completed</p>
+                    <p className="text-2xl font-bold text-green-400">{stats.completed}</p>
+                  </div>
+                </div>
+              </div>
               
               <div className="text-sm text-gray-400">
                 <p className="mb-2">⚠️ Important:</p>
                 <ul className="list-disc pl-5 space-y-1">
                   <li>Only send {selectedCoin} to this address</li>
                   <li>Minimum deposit: 10 {selectedCoin}</li>
-                  <li>After sending, click "Continue to Confirmation"</li>
-                  <li>You'll need to provide transaction hash and screenshot</li>
+                  <li>Enter transaction hash after sending</li>
+                  <li>Deposits are processed within 24 hours</li>
                 </ul>
               </div>
             </div>
@@ -231,6 +384,7 @@ function DepositPage() {
                       <th className="pb-3">Date</th>
                       <th className="pb-3">Amount</th>
                       <th className="pb-3">Currency</th>
+                      <th className="pb-3">Transaction Hash</th>
                       <th className="pb-3">Status</th>
                     </tr>
                   </thead>
@@ -240,6 +394,7 @@ function DepositPage() {
                         <td className="py-4">{formatDate(deposit.createdAt)}</td>
                         <td className="py-4">{deposit.amount}</td>
                         <td className="py-4">{deposit.currency}</td>
+                        <td className="py-4 truncate max-w-[150px]">{deposit.transactionHash}</td>
                         <td className="py-4">{getStatusBadge(deposit.status)}</td>
                       </tr>
                     ))}
@@ -248,14 +403,7 @@ function DepositPage() {
               </div>
             ) : (
               <div className="text-center py-10 text-gray-400">
-                <History className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p>No deposit history found</p>
-                <button
-                  onClick={() => setActiveTab("deposit")}
-                  className="mt-4 text-blue-400 hover:text-blue-300"
-                >
-                  Make your first deposit
-                </button>
+                No deposit history found
               </div>
             )}
           </div>
