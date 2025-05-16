@@ -29,7 +29,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       isAuthenticated && 
       user?.email !== 'admin@gmail.com'
     ) {
-      router.push('/video_route'); // Redirect non-admin users
+      router.push('/'); // Redirect non-admin users to home page
     }
   }, [loading, isAuthenticated, user, router, adminOnly]);
 

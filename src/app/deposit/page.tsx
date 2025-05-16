@@ -15,7 +15,7 @@ export default function DepositPageWrapper() {
 
 function DepositPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, getToken } = useAuth();
   
   const [selectedCoin, setSelectedCoin] = useState("USDT");
   const [amount, setAmount] = useState("");
@@ -45,7 +45,11 @@ function DepositPage() {
     
     setHistoryLoading(true);
     try {
-      const response = await fetch(`/api/deposits/history?userId=${user?.id}`);
+      const response = await fetch(`/api/deposits/history?userId=${user?.id}`, {
+        headers: {
+          'Authorization': `Bearer ${getToken()}`
+        }
+      });
       if (response.ok) {
         const data = await response.json();
         setDepositHistory(data.deposits || []);
@@ -99,6 +103,9 @@ function DepositPage() {
       
       const uploadRes = await fetch('/api/uploads', {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${getToken()}`
+        },
         body: formData,
       });
       
@@ -111,7 +118,10 @@ function DepositPage() {
       // Then submit the deposit confirmation
       const res = await fetch('/api/deposits/confirm', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getToken()}`
+        },
         body: JSON.stringify({
           transactionHash,
           amount,
@@ -129,8 +139,8 @@ function DepositPage() {
       setAmount("");
       setPaymentProof(null);
       
-      // Refresh deposit history
-      fetchDepositHistory();
+      // Redirect to confirmation page
+      router.push(`/deposit/confirm?amount=${amount}&currency=${selectedCoin}&txHash=${transactionHash}`);
     } catch (err: any) {
       setError(err.message);
     } finally {

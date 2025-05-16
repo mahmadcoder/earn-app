@@ -25,6 +25,7 @@ model User {
   deposits   Deposit[]
   stakings   Staking[]
   withdrawals Withdrawal[]
+  fileUploads FileUpload[]
 
   @@map("users")
 }
@@ -57,6 +58,23 @@ model Session {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("sessions")
+}
+
+// File Upload model for storing files
+model FileUpload {
+  id        String   @id @default(uuid())
+  fileName  String
+  fileType  String
+  fileSize  Int
+  fileData  String   // Base64 encoded file data
+  userId    Int      @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("file_uploads")
 }
 
 // Deposit model for tracking user deposits

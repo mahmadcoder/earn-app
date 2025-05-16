@@ -1,8 +1,11 @@
 'use client';
 import Link from 'next/link';
 import React from 'react';
+import { useAuth } from '@/context/AuthContext';
 
 const MoreInfo = () => {
+  const { isAuthenticated } = useAuth();
+  
   const plans = [
     { priceUSD: 50, profitUSD: 2 },
     { priceUSD: 100, profitUSD: 4 },
@@ -40,10 +43,10 @@ const MoreInfo = () => {
 
               {/* Deposit Button */}
               <Link
-                href="/registrationfom"
+                href={isAuthenticated ? "/deposit" : "/registrationfom"}
                 className="mt-4 bg-yellow-500 text-black font-semibold py-2 px-4 rounded-md hover:bg-yellow-600 focus:ring-2 focus:ring-yellow-400"
               >
-                Deposit
+                {isAuthenticated ? "Deposit" : "Register"}
               </Link>
             </div>
           ))}

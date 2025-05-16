@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, getCurrentUser, isAuthenticated, login, logout, register, getUserProfile, initAuth } from '@/lib/auth';
+import { User, getCurrentUser, isAuthenticated, login, logout, register, getUserProfile, initAuth, getToken } from '@/lib/auth';
 
 interface AuthContextType {
   user: User | null;
@@ -12,6 +12,7 @@ interface AuthContextType {
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  getToken: () => string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -112,7 +113,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     login: handleLogin,
     register: handleRegister,
     logout: handleLogout,
-    refreshUser
+    refreshUser,
+    getToken
   };
   
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

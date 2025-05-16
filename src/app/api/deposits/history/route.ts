@@ -34,8 +34,44 @@ async function getDepositHistory(request: AuthRequest) {
       }
     });
 
+    // Get total deposit stats using groupBy
+    const stats = await prisma.deposit.groupBy({
+      by: ['status'],
+      where: {
+        userId: targetUserId
+      },
+      _count: {
+        id: true
+      },
+      _sum: {
+        amount: true
+      }
+    });
+
+    // Format stats for easier consumption
+    const formattedStats = {
+      total: 0,
+      pending: 0,
+      completed: 0,
+      rejected: 0,
+      totalAmount: 0
+    };
+
+    stats.forEach(stat => {
+      const count = stat._count.id;
+      const amount = stat._sum.amount || 0;
+      
+      formattedStats.total += count;
+      formattedStats.totalAmount += amount;
+      
+      if (stat.status === 'pending') formattedStats.pending = count;
+      if (stat.status === 'confirmed') formattedStats.completed = count;
+      if (stat.status === 'rejected') formattedStats.rejected = count;
+    });
+
     return NextResponse.json({
-      deposits
+      deposits,
+      stats: formattedStats
     }, { status: 200 });
   } catch (error) {
     console.error('Deposit history fetch error:', error);

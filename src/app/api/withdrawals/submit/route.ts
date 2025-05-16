@@ -8,6 +8,13 @@ async function submitWithdrawal(request: AuthRequest) {
     // User is already authenticated via middleware
     const userId = request.user?.id;
     
+    if (!userId) {
+      return NextResponse.json(
+        { message: 'User not authenticated' },
+        { status: 401 }
+      );
+    }
+
     // Get request body
     const data = await request.json();
     const { amount, currency, recipientAddress } = data;
