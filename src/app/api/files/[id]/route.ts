@@ -1,12 +1,18 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+interface RouteParams {
+  params: {
+    id: string;
+  };
+}
+
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  context: RouteParams
 ) {
   try {
-    const { id } = params;
+    const { id } = context.params;
 
     // Log the incoming request
     console.log(`[File Request] Attempting to fetch file with ID: ${id}`);
@@ -37,7 +43,7 @@ export async function GET(
     console.error('[File Service Error]', {
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
-      fileId: params.id,
+      fileId: context.params.id,
       timestamp: new Date().toISOString()
     });
     return Response.json({ error: 'Internal Server Error' }, { status: 500 });
