@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Clock, CheckCircle, AlertCircle, Loader2, ArrowDown, History } from 'lucide-react';
+import { Clock, CheckCircle, AlertCircle, Loader2, ArrowDown, History, XCircle, CheckSquare } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import ProtectedRoute from '@/app/components/ProtectedRoute';
 
@@ -16,7 +16,7 @@ export default function WithdrawPageWrapper() {
 function WithdrawPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
+  const { user, getToken } = useAuth();
   
   const [address, setAddress] = useState('');
   const [amount, setAmount] = useState('');
@@ -41,7 +41,11 @@ function WithdrawPage() {
     
     setHistoryLoading(true);
     try {
-      const response = await fetch(`/api/withdrawals/history?userId=${user?.id}`);
+      const response = await fetch(`/api/withdrawals/history?userId=${user?.id}`, {
+        headers: {
+          'Authorization': `Bearer ${getToken()}`
+        }
+      });
       if (response.ok) {
         const data = await response.json();
         setWithdrawals(data.withdrawals || []);
@@ -58,7 +62,7 @@ function WithdrawPage() {
     } finally {
       setHistoryLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, getToken]);
 
   // Fetch withdrawal history and stats
   useEffect(() => {
@@ -106,31 +110,32 @@ function WithdrawPage() {
   
   // Get status badge based on withdrawal status
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "completed":
+    switch (status.toLowerCase()) {
+      case "confirm":
         return (
           <span className="flex items-center text-green-400 text-sm">
-            <CheckCircle className="w-4 h-4 mr-1" />
-            Completed
+            <CheckSquare className="w-4 h-4 mr-1" />
+            Confirm
           </span>
         );
       case "pending":
         return (
           <span className="flex items-center text-yellow-400 text-sm">
-            <Clock className="w-4 h-4 mr-1" />
+            <Clock className="w-4 h-4 mr-1 animate-pulse" />
             Pending
           </span>
         );
-      case "rejected":
+      case "reject":
         return (
           <span className="flex items-center text-red-400 text-sm">
-            <AlertCircle className="w-4 h-4 mr-1" />
-            Rejected
+            <XCircle className="w-4 h-4 mr-1" />
+            Reject
           </span>
         );
       default:
         return (
           <span className="flex items-center text-gray-400 text-sm">
+            <Clock className="w-4 h-4 mr-1" />
             {status}
           </span>
         );

@@ -22,7 +22,6 @@ async function uploadFile(request: AuthRequest) {
       size: file.size
     });
 
-    /* Temporarily commented out for testing
     // Validate file type
     if (!file.type.startsWith('image/')) {
       return NextResponse.json(
@@ -30,7 +29,6 @@ async function uploadFile(request: AuthRequest) {
         { status: 400 }
       );
     }
-    */
 
     // Validate file size (5MB limit)
     if (file.size > 5 * 1024 * 1024) {
@@ -44,7 +42,7 @@ async function uploadFile(request: AuthRequest) {
     // Convert file to base64
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const base64String = buffer.toString('base64');
+    const base64String = `data:${file.type};base64,${buffer.toString('base64')}`;
 
     // Generate unique filename
     const timestamp = Date.now();

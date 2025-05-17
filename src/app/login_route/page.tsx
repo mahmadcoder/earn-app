@@ -36,7 +36,7 @@ const LoginForm = () => {
       setMessage("Login successful!");
 
       // Redirect based on email
-      if (formData.email === "admin@gmail.com") {
+      if (formData.email === "admin@example.com") {
         setTimeout(() => {
           router.push("/dashboard"); // Admin goes to dashboard
         }, 1000);

@@ -1,9 +1,10 @@
 'use client';
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle, Clock, AlertCircle, Upload, History, Loader2 } from "lucide-react";
+import { CheckCircle, Clock, AlertCircle, Upload, History, Loader2, XCircle, CheckSquare, Image as ImageIcon, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import ProtectedRoute from "@/app/components/ProtectedRoute";
+import Image from "next/image";
 
 export default function DepositPageWrapper() {
   return (
@@ -34,6 +35,7 @@ function DepositPage() {
     rejected: 0,
     totalAmount: 0
   });
+  const [selectedProof, setSelectedProof] = useState<string | null>(null);
 
   const walletAddresses = {
     USDT: "TJuZCvYANND2emRa4ssrWqpZswPFUaJVWQ",
@@ -178,39 +180,71 @@ function DepositPage() {
   
   // Get status badge based on deposit status
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "confirmed":
+    switch (status.toLowerCase()) {
+      case "confirm":
         return (
           <span className="flex items-center text-green-400 text-sm">
-            <CheckCircle className="w-4 h-4 mr-1" />
-            Confirmed
+            <CheckSquare className="w-4 h-4 mr-1" />
+            Confirm
           </span>
         );
       case "pending":
         return (
           <span className="flex items-center text-yellow-400 text-sm">
-            <Clock className="w-4 h-4 mr-1" />
+            <Clock className="w-4 h-4 mr-1 animate-pulse" />
             Pending
           </span>
         );
-      case "rejected":
+      case "reject":
         return (
           <span className="flex items-center text-red-400 text-sm">
-            <AlertCircle className="w-4 h-4 mr-1" />
-            Rejected
+            <XCircle className="w-4 h-4 mr-1" />
+            Reject
           </span>
         );
       default:
         return (
           <span className="flex items-center text-gray-400 text-sm">
+            <Clock className="w-4 h-4 mr-1" />
             {status}
           </span>
         );
     }
   };
 
+  // Add this new component for the modal
+  const ImageModal = ({ imageUrl, onClose }: { imageUrl: string; onClose: () => void }) => {
+    if (!imageUrl) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <div className="relative max-w-4xl w-full bg-gray-800 rounded-lg overflow-hidden">
+          <button
+            onClick={onClose}
+            className="absolute top-2 right-2 text-white hover:text-gray-300 z-10"
+          >
+            <X className="w-6 h-6" />
+          </button>
+          <div className="relative w-full h-[80vh]">
+            <img
+              src={imageUrl}
+              alt="Payment Proof"
+              className="w-full h-full object-contain"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 text-white p-6">
+      {selectedProof && (
+        <ImageModal
+          imageUrl={selectedProof}
+          onClose={() => setSelectedProof(null)}
+        />
+      )}
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold mb-6 text-center">Deposit</h1>
         
@@ -395,6 +429,7 @@ function DepositPage() {
                       <th className="pb-3">Amount</th>
                       <th className="pb-3">Currency</th>
                       <th className="pb-3">Transaction Hash</th>
+                      <th className="pb-3">Proof</th>
                       <th className="pb-3">Status</th>
                     </tr>
                   </thead>
@@ -405,6 +440,17 @@ function DepositPage() {
                         <td className="py-4">{deposit.amount}</td>
                         <td className="py-4">{deposit.currency}</td>
                         <td className="py-4 truncate max-w-[150px]">{deposit.transactionHash}</td>
+                        <td className="py-4">
+                          {deposit.paymentProofUrl && (
+                            <button
+                              onClick={() => setSelectedProof(deposit.paymentProofUrl)}
+                              className="flex items-center text-blue-400 hover:text-blue-300"
+                            >
+                              <ImageIcon className="w-4 h-4 mr-1" />
+                              View
+                            </button>
+                          )}
+                        </td>
                         <td className="py-4">{getStatusBadge(deposit.status)}</td>
                       </tr>
                     ))}

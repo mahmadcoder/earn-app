@@ -6,32 +6,28 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const fileUpload = await prisma.fileUpload.findUnique({
-      where: { id: params.id }
+    const fileId = params.id;
+
+    // Get file data from database
+    const fileData = await prisma.fileUpload.findUnique({
+      where: {
+        id: fileId,
+      },
     });
 
-    if (!fileUpload) {
-      return NextResponse.json(
-        { message: 'File not found' },
-        { status: 404 }
-      );
+    if (!fileData) {
+      return new NextResponse('File not found', { status: 404 });
     }
 
-    // Convert base64 to buffer
-    const buffer = Buffer.from(fileUpload.fileData, 'base64');
-
-    // Create response with appropriate headers
-    return new NextResponse(buffer, {
+    // Return the base64 data directly
+    return new NextResponse(fileData.fileData, {
       headers: {
-        'Content-Type': fileUpload.fileType,
-        'Content-Disposition': `inline; filename="${fileUpload.fileName}"`,
-      },
+        'Content-Type': fileData.fileType,
+        'Cache-Control': 'public, max-age=31536000' // Cache for 1 year
+      }
     });
   } catch (error) {
     console.error('Error serving file:', error);
-    return NextResponse.json(
-      { message: 'Internal server error' },
-      { status: 500 }
-    );
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 } 

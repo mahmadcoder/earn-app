@@ -7,7 +7,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("NEON_DATABASE_URL")
+  url      = env("DATABASE_URL")
 }
 
 // User model
@@ -66,7 +66,7 @@ model FileUpload {
   fileName  String
   fileType  String
   fileSize  Int
-  fileData  String   // Base64 encoded file data
+  fileData  String   @db.Text // Base64 encoded file data
   userId    Int      @map("user_id")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -124,7 +124,7 @@ model Withdrawal {
   currency        String
   recipientAddress String    @map("recipient_address")
   transactionHash String?   @map("transaction_hash")
-  status          String    @default("pending") // pending, completed, rejected
+  status          String    @default("pending") // pending, confirm, reject
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
   processedAt     DateTime? @map("processed_at")

@@ -64,9 +64,17 @@ async function getWithdrawalHistory(request: AuthRequest) {
       formattedStats.total += count;
       formattedStats.totalAmount += amount;
       
-      if (stat.status === 'pending') formattedStats.pending = count;
-      if (stat.status === 'completed') formattedStats.completed = count;
-      if (stat.status === 'rejected') formattedStats.rejected = count;
+      switch (stat.status.toLowerCase()) {
+        case 'pending':
+          formattedStats.pending = count;
+          break;
+         case 'confirm':
+          formattedStats.completed = count;
+          break;
+        case 'reject':
+          formattedStats.rejected = count;
+          break;
+      }
     });
 
     return NextResponse.json({

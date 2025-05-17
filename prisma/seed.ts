@@ -7,11 +7,13 @@ async function main() {
   try {
     console.log('Starting database seed...');
 
-    // Create admin user
-    const adminPassword = await bcrypt.hash('admin123', 10);
+    // Create admin user with credentials from .env
+    const adminPassword = await bcrypt.hash('Imranhelo123@', 10);
     const admin = await prisma.user.upsert({
       where: { email: 'admin@gmail.com' },
-      update: {},
+      update: {
+        password: adminPassword // Update password even if user exists
+      },
       create: {
         name: 'Admin User',
         email: 'admin@gmail.com',
@@ -28,7 +30,7 @@ async function main() {
       }
     });
 
-    console.log('Created admin user:', admin.email);
+    console.log('Created/Updated admin user:', admin.email);
 
     // Create test user
     const userPassword = await bcrypt.hash('user123', 10);
