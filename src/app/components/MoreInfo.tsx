@@ -43,7 +43,7 @@ const MoreInfo = () => {
 
               {/* Deposit Button */}
               <Link
-                href={isAuthenticated ? "/deposit" : "/registrationfom"}
+                href={isAuthenticated ? "/staking" : "/registrationfom"}
                 className="mt-4 bg-yellow-500 text-black font-semibold py-2 px-4 rounded-md hover:bg-yellow-600 focus:ring-2 focus:ring-yellow-400"
               >
                 {isAuthenticated ? "Deposit" : "Register"}

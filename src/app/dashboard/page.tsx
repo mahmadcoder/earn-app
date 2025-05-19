@@ -8,7 +8,15 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState<'chat' | 'admin'>('chat');
 
   const handleDirectusAccess = () => {
-    const directusUrl = process.env.NEXT_PUBLIC_DIRECTUS_URL || 'http://localhost:8055';
+    let directusUrl = process.env.NEXT_PUBLIC_DIRECTUS_URL;
+    if (!directusUrl) {
+      // If running on localhost, use local Directus, otherwise use deployed URL
+      if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+        directusUrl = 'http://localhost:8055';
+      } else {
+        directusUrl = 'https://directus-production-f0ea7.up.railway.app';
+      }
+    }
     window.open(directusUrl, '_blank');
   };
 
