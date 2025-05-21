@@ -26,6 +26,7 @@ model User {
   stakings   Staking[]
   withdrawals Withdrawal[]
   fileUploads FileUpload[]
+  userPlanProgresses UserPlanProgress[]
 
   @@map("users")
 }
@@ -133,4 +134,17 @@ model Withdrawal {
   user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("withdrawals")
+}
+
+model UserPlanProgress {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  planAmount     Int
+  profit         Int      @default(0)
+  roundCount     Int      @default(0)
+  lastRoundDate  DateTime?
+  canWithdraw    Boolean  @default(false)
+  user           User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, planAmount])
 }

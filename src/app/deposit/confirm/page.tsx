@@ -21,6 +21,15 @@ function DepositConfirmPage() {
   const currency = searchParams.get('currency') || 'USDT';
   const txHash = searchParams.get('txHash') || '';
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const watched = localStorage.getItem('videoWatched');
+      if (!watched) {
+        router.push('/video_route');
+      }
+    }
+  }, [router]);
+
   const handleBackToDeposit = () => {
     router.push('/deposit');
   };

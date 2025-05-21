@@ -1,9 +1,35 @@
-'use client';
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Clock, CheckCircle, AlertCircle, Loader2, ArrowDown, History, XCircle, CheckSquare } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
-import ProtectedRoute from '@/app/components/ProtectedRoute';
+"use client";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
+  ArrowDown,
+  History,
+  XCircle,
+  CheckSquare,
+} from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import ProtectedRoute from "@/app/components/ProtectedRoute";
+
+type Withdrawal = {
+  id: string;
+  createdAt: string;
+  amount: number;
+  currency: string;
+  recipientAddress: string;
+  status: string;
+};
+
+type WithdrawalStats = {
+  total: number;
+  pending: number;
+  completed: number;
+  rejected: number;
+  totalAmount: number;
+};
 
 export default function WithdrawPageWrapper() {
   return (
@@ -17,48 +43,74 @@ function WithdrawPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, getToken } = useAuth();
-  
-  const [address, setAddress] = useState('');
-  const [amount, setAmount] = useState('');
-  const [asset, setAsset] = useState('USDT');
+
+  const [address, setAddress] = useState("");
+  const [amount, setAmount] = useState("");
+  const [asset, setAsset] = useState("USDT");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
-  
-  const [withdrawals, setWithdrawals] = useState<any[]>([]);
-  const [stats, setStats] = useState<any>({
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
+  const [stats, setStats] = useState<WithdrawalStats>({
     total: 0,
     pending: 0,
     completed: 0,
     rejected: 0,
-    totalAmount: 0
+    totalAmount: 0,
   });
   const [historyLoading, setHistoryLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('withdraw'); // withdraw or history
+  const [activeTab, setActiveTab] = useState("withdraw"); // withdraw or history
+
+  // Backend eligibility check for withdrawal
+  useEffect(() => {
+    const checkEligibility = async () => {
+      try {
+        const res = await fetch("/api/plan/all-progress");
+        const data = await res.json();
+        if (res.ok && Array.isArray(data.progresses)) {
+          const eligible = data.progresses.some((p) => p.canWithdraw);
+          if (!eligible) {
+            router.push("/video_route?reason=complete_videos_first");
+          }
+        } else {
+          router.push("/video_route?reason=complete_videos_first");
+        }
+      } catch {
+        router.push("/video_route?reason=complete_videos_first");
+      }
+    };
+    checkEligibility();
+  }, [router]);
 
   const fetchWithdrawalHistory = useCallback(async () => {
     if (!user?.id) return;
-    
+
     setHistoryLoading(true);
     try {
-      const response = await fetch(`/api/withdrawals/history?userId=${user?.id}`, {
-        headers: {
-          'Authorization': `Bearer ${getToken()}`
+      const response = await fetch(
+        `/api/withdrawals/history?userId=${user?.id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${getToken()}`,
+          },
         }
-      });
+      );
       if (response.ok) {
         const data = await response.json();
         setWithdrawals(data.withdrawals || []);
-        setStats(data.stats || {
-          total: 0,
-          pending: 0,
-          completed: 0,
-          rejected: 0,
-          totalAmount: 0
-        });
+        setStats(
+          data.stats || {
+            total: 0,
+            pending: 0,
+            completed: 0,
+            rejected: 0,
+            totalAmount: 0,
+          }
+        );
       }
     } catch (error) {
-      console.error('Failed to fetch withdrawal history:', error);
+      console.error("Failed to fetch withdrawal history:", error);
     } finally {
       setHistoryLoading(false);
     }
@@ -68,12 +120,12 @@ function WithdrawPage() {
   useEffect(() => {
     fetchWithdrawalHistory();
   }, [fetchWithdrawalHistory]);
-  
+
   // Check if we have a success message from confirmation page
   useEffect(() => {
-    const success = searchParams.get('success');
-    if (success === 'true') {
-      setMessage('Withdrawal request submitted successfully!');
+    const success = searchParams.get("success");
+    if (success === "true") {
+      setMessage("Withdrawal request submitted successfully!");
       // Refresh withdrawal history
       fetchWithdrawalHistory();
     }
@@ -81,21 +133,25 @@ function WithdrawPage() {
 
   const handleWithdraw = () => {
     if (!address.trim()) {
-      setError('Please enter a valid recipient address');
+      setError("Please enter a valid recipient address");
       return;
     }
-    
+
     if (!amount || parseFloat(amount) <= 0) {
-      setError('Please enter a valid amount');
+      setError("Please enter a valid amount");
       return;
     }
-    
+
     setLoading(true);
-    setMessage('');
-    setError('');
+    setMessage("");
+    setError("");
 
     // Redirect to confirmation page with withdrawal details
-    router.push(`/withdraw/confirm?amount=${amount}&currency=${asset}&address=${encodeURIComponent(address)}`);
+    router.push(
+      `/withdraw/confirm?amount=${amount}&currency=${asset}&address=${encodeURIComponent(
+        address
+      )}`
+    );
   };
 
   // Format date for display
@@ -107,7 +163,7 @@ function WithdrawPage() {
       day: "numeric",
     });
   };
-  
+
   // Get status badge based on withdrawal status
   const getStatusBadge = (status: string) => {
     switch (status.toLowerCase()) {
@@ -146,18 +202,26 @@ function WithdrawPage() {
     <div className="min-h-screen bg-gray-900 text-white p-6">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold mb-6 text-center">Withdraw Funds</h1>
-        
+
         {/* Tab Navigation */}
         <div className="flex mb-6 border-b border-gray-700">
           <button
             onClick={() => setActiveTab("withdraw")}
-            className={`py-3 px-6 font-medium ${activeTab === "withdraw" ? "text-blue-400 border-b-2 border-blue-400" : "text-gray-400"}`}
+            className={`py-3 px-6 font-medium ${
+              activeTab === "withdraw"
+                ? "text-blue-400 border-b-2 border-blue-400"
+                : "text-gray-400"
+            }`}
           >
             Make Withdrawal
           </button>
           <button
             onClick={() => setActiveTab("history")}
-            className={`py-3 px-6 font-medium ${activeTab === "history" ? "text-blue-400 border-b-2 border-blue-400" : "text-gray-400"}`}
+            className={`py-3 px-6 font-medium ${
+              activeTab === "history"
+                ? "text-blue-400 border-b-2 border-blue-400"
+                : "text-gray-400"
+            }`}
           >
             <span className="flex items-center">
               <History className="w-4 h-4 mr-2" />
@@ -165,27 +229,29 @@ function WithdrawPage() {
             </span>
           </button>
         </div>
-        
+
         {activeTab === "withdraw" ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Withdrawal Form */}
             <div className="bg-gray-800 rounded-2xl shadow-xl p-6">
               <h2 className="text-xl font-semibold mb-4">Request Withdrawal</h2>
-              
+
               <label className="block mb-2 text-sm font-medium">Asset</label>
               <select
                 value={asset}
-                onChange={e => setAsset(e.target.value)}
+                onChange={(e) => setAsset(e.target.value)}
                 className="w-full mb-4 p-3 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="USDT">Tether (USDT)</option>
               </select>
 
-              <label className="block mb-2 text-sm font-medium">Recipient Address</label>
+              <label className="block mb-2 text-sm font-medium">
+                Recipient Address
+              </label>
               <input
                 type="text"
                 value={address}
-                onChange={e => setAddress(e.target.value)}
+                onChange={(e) => setAddress(e.target.value)}
                 className="w-full mb-4 p-3 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Enter wallet address"
               />
@@ -194,7 +260,7 @@ function WithdrawPage() {
               <input
                 type="number"
                 value={amount}
-                onChange={e => setAmount(e.target.value)}
+                onChange={(e) => setAmount(e.target.value)}
                 className="w-full mb-4 p-3 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Enter amount"
               />
@@ -207,7 +273,7 @@ function WithdrawPage() {
                   </div>
                 </div>
               )}
-              
+
               {error && (
                 <div className="mb-4 p-3 bg-red-900/50 border border-red-700 rounded-lg">
                   <div className="flex items-center text-red-400 font-medium">
@@ -220,7 +286,9 @@ function WithdrawPage() {
               <button
                 onClick={handleWithdraw}
                 disabled={loading}
-                className={`w-full ${loading ? "bg-blue-800" : "bg-blue-600 hover:bg-blue-700"} text-white py-3 rounded font-semibold flex items-center justify-center`}
+                className={`w-full ${
+                  loading ? "bg-blue-800" : "bg-blue-600 hover:bg-blue-700"
+                } text-white py-3 rounded font-semibold flex items-center justify-center`}
               >
                 {loading ? (
                   <>
@@ -232,11 +300,13 @@ function WithdrawPage() {
                 )}
               </button>
             </div>
-            
+
             {/* Withdrawal Stats */}
             <div className="bg-gray-800 rounded-2xl shadow-xl p-6">
-              <h2 className="text-xl font-semibold mb-4">Withdrawal Statistics</h2>
-              
+              <h2 className="text-xl font-semibold mb-4">
+                Withdrawal Statistics
+              </h2>
+
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="bg-gray-700 p-4 rounded-lg">
                   <p className="text-gray-400 text-sm">Total Withdrawals</p>
@@ -244,18 +314,24 @@ function WithdrawPage() {
                 </div>
                 <div className="bg-gray-700 p-4 rounded-lg">
                   <p className="text-gray-400 text-sm">Total Amount</p>
-                  <p className="text-2xl font-bold">{stats.totalAmount.toFixed(2)}</p>
+                  <p className="text-2xl font-bold">
+                    {stats.totalAmount.toFixed(2)}
+                  </p>
                 </div>
                 <div className="bg-gray-700 p-4 rounded-lg">
                   <p className="text-gray-400 text-sm">Pending</p>
-                  <p className="text-2xl font-bold text-yellow-400">{stats.pending}</p>
+                  <p className="text-2xl font-bold text-yellow-400">
+                    {stats.pending}
+                  </p>
                 </div>
                 <div className="bg-gray-700 p-4 rounded-lg">
                   <p className="text-gray-400 text-sm">Completed</p>
-                  <p className="text-2xl font-bold text-green-400">{stats.completed}</p>
+                  <p className="text-2xl font-bold text-green-400">
+                    {stats.completed}
+                  </p>
                 </div>
               </div>
-              
+
               <div className="text-sm text-gray-400">
                 <p className="mb-2">⚠️ Important Notes:</p>
                 <ul className="list-disc pl-5 space-y-1">
@@ -265,20 +341,29 @@ function WithdrawPage() {
                   <li>Transaction fees will be deducted from the amount</li>
                 </ul>
               </div>
-              
+
               {withdrawals.length > 0 && (
                 <div className="mt-6">
-                  <h3 className="text-lg font-medium mb-2">Recent Withdrawals</h3>
+                  <h3 className="text-lg font-medium mb-2">
+                    Recent Withdrawals
+                  </h3>
                   <div className="space-y-2">
                     {withdrawals.slice(0, 3).map((withdrawal) => (
-                      <div key={withdrawal.id} className="bg-gray-700 p-3 rounded-lg">
+                      <div
+                        key={withdrawal.id}
+                        className="bg-gray-700 p-3 rounded-lg"
+                      >
                         <div className="flex justify-between items-center">
-                          <span className="text-sm">{formatDate(withdrawal.createdAt)}</span>
+                          <span className="text-sm">
+                            {formatDate(withdrawal.createdAt)}
+                          </span>
                           {getStatusBadge(withdrawal.status)}
                         </div>
                         <div className="flex justify-between items-center mt-1">
-                          <span className="font-medium">{withdrawal.amount} {withdrawal.currency}</span>
-                          <button 
+                          <span className="font-medium">
+                            {withdrawal.amount} {withdrawal.currency}
+                          </span>
+                          <button
                             onClick={() => setActiveTab("history")}
                             className="text-xs text-blue-400 hover:text-blue-300"
                           >
@@ -294,8 +379,10 @@ function WithdrawPage() {
           </div>
         ) : (
           <div className="bg-gray-800 rounded-2xl shadow-xl p-6">
-            <h2 className="text-xl font-semibold mb-4">Your Withdrawal History</h2>
-            
+            <h2 className="text-xl font-semibold mb-4">
+              Your Withdrawal History
+            </h2>
+
             {historyLoading ? (
               <div className="flex justify-center items-center py-10">
                 <Loader2 className="animate-spin h-8 w-8 text-blue-500" />
@@ -314,12 +401,21 @@ function WithdrawPage() {
                   </thead>
                   <tbody>
                     {withdrawals.map((withdrawal) => (
-                      <tr key={withdrawal.id} className="border-b border-gray-700">
-                        <td className="py-4">{formatDate(withdrawal.createdAt)}</td>
+                      <tr
+                        key={withdrawal.id}
+                        className="border-b border-gray-700"
+                      >
+                        <td className="py-4">
+                          {formatDate(withdrawal.createdAt)}
+                        </td>
                         <td className="py-4">{withdrawal.amount}</td>
                         <td className="py-4">{withdrawal.currency}</td>
-                        <td className="py-4 truncate max-w-[150px]">{withdrawal.recipientAddress}</td>
-                        <td className="py-4">{getStatusBadge(withdrawal.status)}</td>
+                        <td className="py-4 truncate max-w-[150px]">
+                          {withdrawal.recipientAddress}
+                        </td>
+                        <td className="py-4">
+                          {getStatusBadge(withdrawal.status)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
