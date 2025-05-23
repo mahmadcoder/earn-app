@@ -20,8 +20,8 @@ const Videos = () => {
   const { user, getToken } = useAuth();
 
   const videoUrls = [
-    // "https://www.youtube.com/watch?v=LXb3EKWsInQ",
-    "https://www.youtube.com/watch?v=ScMzIvxBSi4",
+    "https://www.youtube.com/watch?v=LXb3EKWsInQ",
+    // "https://www.youtube.com/watch?v=ScMzIvxBSi4",
     // "https://www.youtube.com/watch?v=3JZ_D3ELwOQ",
     // "https://www.youtube.com/watch?v=kJQP7kiw5Fk",
   ];
@@ -268,13 +268,12 @@ const Videos = () => {
                 },
               }}
             />
-            {!isVideoEnded && (
+            {isVideoEnded && (
               <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
-                <div className="text-white text-center">
-                  <p className="text-lg mb-2">
-                    Please watch the video to continue
+                <div className="text-green-400 text-center">
+                  <p className="text-lg font-bold mb-2">
+                    Watch complete! You can now proceed.
                   </p>
-                  <p className="text-sm text-gray-300">Video will auto-play</p>
                 </div>
               </div>
             )}
