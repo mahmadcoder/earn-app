@@ -63,25 +63,51 @@ function WithdrawPage() {
   const [activeTab, setActiveTab] = useState("withdraw"); // withdraw or history
 
   // Backend eligibility check for withdrawal
+  // Update in withdraw page
   useEffect(() => {
     const checkEligibility = async () => {
       try {
-        const res = await fetch("/api/plan/all-progress");
+        const res = await fetch("/api/plan/all-progress", {
+          headers: {
+            Authorization: `Bearer ${getToken()}`,
+          },
+        });
         const data = await res.json();
         if (res.ok && Array.isArray(data.progresses)) {
-          const eligible = data.progresses.some((p) => p.canWithdraw);
+          const eligible = data.progresses.some(
+            (p) => p.canWithdraw && p.profit > 0 && p.roundCount > 0
+          );
           if (!eligible) {
             router.push("/video_route?reason=complete_videos_first");
+            // Force refetch to update state after redirect
+            await fetch("/api/plan/all-progress", {
+              headers: {
+                Authorization: `Bearer ${getToken()}`,
+                "Content-Type": "application/json",
+              },
+            });
           }
         } else {
           router.push("/video_route?reason=complete_videos_first");
+          await fetch("/api/plan/all-progress", {
+            headers: {
+              Authorization: `Bearer ${getToken()}`,
+              "Content-Type": "application/json",
+            },
+          });
         }
       } catch {
         router.push("/video_route?reason=complete_videos_first");
+        await fetch("/api/plan/all-progress", {
+          headers: {
+            Authorization: `Bearer ${getToken()}`,
+            "Content-Type": "application/json",
+          },
+        });
       }
     };
     checkEligibility();
-  }, [router]);
+  }, [router, getToken]);
 
   const fetchWithdrawalHistory = useCallback(async () => {
     if (!user?.id) return;

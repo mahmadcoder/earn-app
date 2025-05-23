@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
 import React from "react";
+import { useRouter } from "next/navigation";
 
 const navbarLinks = [
   { href: "/", label: "Home" },
@@ -14,9 +15,13 @@ const navbarLinks = [
 export default function Navbar() {
   const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, getToken } = useAuth();
   const [profit, setProfit] = useState<number | null>(null);
   const [profitLoading, setProfitLoading] = useState(false);
+  const [planProgress, setPlanProgress] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [depositLockLeft, setDepositLockLeft] = useState(0);
+  const router = useRouter();
 
   const toggleMobileMenu = () => setMobileMenuOpen((prev) => !prev);
   const toggleProfile = () => setIsProfileOpen((prev) => !prev);
@@ -28,32 +33,133 @@ export default function Navbar() {
   };
 
   // Fetch user profit
+  const fetchProfit = async () => {
+    if (!isAuthenticated || !getToken()) return;
+
+    setProfitLoading(true);
+    try {
+      // Fetch all plan progresses for the user with authentication
+      const res = await fetch(`/api/plan/all-progress`, {
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await res.json();
+      console.log("Fetched profit data:", data); // Debug line
+      if (res.ok && data.success) {
+        setProfit(data.totalProfit || 0);
+      } else {
+        console.error("Failed to fetch profit:", data.error);
+        setProfit(0);
+      }
+    } catch (error) {
+      console.error("Error fetching profit:", error);
+      setProfit(0);
+    } finally {
+      setProfitLoading(false);
+    }
+  };
+
   useEffect(() => {
-    if (!isAuthenticated) return;
-    const fetchProfit = async () => {
-      setProfitLoading(true);
-      try {
-        // Fetch all plan progresses for the user
-        const res = await fetch(`/api/plan/all-progress`);
-        const data = await res.json();
-        if (res.ok && Array.isArray(data.progresses)) {
-          // Sum all profits
-          const totalProfit = data.progresses.reduce(
-            (sum, p) => sum + (p.profit || 0),
-            0
-          );
-          setProfit(totalProfit);
+    if (isAuthenticated) {
+      fetchProfit();
+    } else {
+      setProfit(null);
+    }
+  }, [isAuthenticated]);
+
+  // Listen for profitUpdated event to refresh profit
+  useEffect(() => {
+    const handleProfitUpdate = (e: CustomEvent) => {
+      if (isAuthenticated) {
+        // If event has detail with totalProfit, use that
+        if (e.detail?.totalProfit !== undefined) {
+          setProfit(e.detail.totalProfit);
         } else {
-          setProfit(null);
+          // Otherwise fetch fresh data
+          fetchProfit();
         }
-      } catch {
-        setProfit(null);
-      } finally {
-        setProfitLoading(false);
       }
     };
-    fetchProfit();
+    window.addEventListener(
+      "profitUpdated",
+      handleProfitUpdate as EventListener
+    );
+    return () => {
+      window.removeEventListener(
+        "profitUpdated",
+        handleProfitUpdate as EventListener
+      );
+    };
   }, [isAuthenticated]);
+
+  // Fetch plan progress for timer/button
+  useEffect(() => {
+    const fetchPlanProgress = async () => {
+      if (!isAuthenticated || !getToken()) return;
+      try {
+        const res = await fetch(`/api/plan/all-progress`, {
+          headers: {
+            Authorization: `Bearer ${getToken()}`,
+            "Content-Type": "application/json",
+          },
+        });
+        const data = await res.json();
+        if (
+          res.ok &&
+          data.success &&
+          data.progresses &&
+          data.progresses.length > 0
+        ) {
+          // Use the most recent plan
+          setPlanProgress(data.progresses[0]);
+        } else {
+          setPlanProgress(null);
+        }
+      } catch {
+        setPlanProgress(null);
+      }
+    };
+    fetchPlanProgress();
+  }, [isAuthenticated, getToken]);
+
+  // Calculate time left for next round
+  useEffect(() => {
+    if (!planProgress || !planProgress.lastRoundDate) {
+      setTimeLeft(0);
+      return;
+    }
+    const lastRound = new Date(planProgress.lastRoundDate);
+    const nextTime = new Date(lastRound.getTime() + 24 * 60 * 60 * 1000);
+    const update = () => {
+      const now = new Date();
+      const diff = nextTime.getTime() - now.getTime();
+      setTimeLeft(diff > 0 ? diff : 0);
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [planProgress]);
+
+  // Calculate time left for 30-day deposit lock
+  useEffect(() => {
+    if (!planProgress || !planProgress.lastRoundDate) {
+      setDepositLockLeft(0);
+      return;
+    }
+    const lastPlan = new Date(planProgress.lastRoundDate);
+    const unlockTime = new Date(lastPlan.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const update = () => {
+      const now = new Date();
+      const diff = unlockTime.getTime() - now.getTime();
+      setDepositLockLeft(diff > 0 ? diff : 0);
+    };
+    update();
+    const interval = setInterval(update, 1000 * 60); // update every minute
+    return () => clearInterval(interval);
+  }, [planProgress]);
 
   // Close profile dropdown when clicking outside
   const handleClickOutside = (e: MouseEvent) => {
@@ -113,10 +219,26 @@ export default function Navbar() {
           {isAuthenticated ? (
             <div className="flex items-center space-x-4">
               <Link
-                href="/deposit"
-                className="text-white bg-yellow-500 px-4 py-2 rounded hover:bg-yellow-400"
+                href={depositLockLeft > 0 ? "#" : "/deposit"}
+                className={`px-4 py-2 rounded font-semibold transition ${
+                  depositLockLeft > 0
+                    ? "bg-gray-500 text-gray-300 cursor-not-allowed"
+                    : "bg-yellow-500 text-white hover:bg-yellow-400"
+                }`}
+                onClick={(e) => {
+                  if (depositLockLeft > 0) e.preventDefault();
+                }}
+                tabIndex={depositLockLeft > 0 ? -1 : 0}
               >
-                Deposit
+                {depositLockLeft > 0
+                  ? `Deposit after ${Math.ceil(
+                      depositLockLeft / (1000 * 60 * 60 * 24)
+                    )} ${
+                      Math.ceil(depositLockLeft / (1000 * 60 * 60 * 24)) === 1
+                        ? "day"
+                        : "days"
+                    }`
+                  : "Deposit"}
               </Link>
               <Link
                 href="/withdraw"
@@ -159,6 +281,28 @@ export default function Navbar() {
                         {user?.name}
                       </p>
                       <p className="text-sm text-gray-500">{user?.email}</p>
+                      {/* Next round timer/button */}
+                      {planProgress && planProgress.lastRoundDate && (
+                        <div className="mt-2">
+                          {timeLeft > 0 ? (
+                            <div className="text-xs text-blue-600">
+                              Next round active in:{" "}
+                              {`${Math.floor(
+                                timeLeft / (1000 * 60 * 60)
+                              )}h ${Math.floor(
+                                (timeLeft / (1000 * 60)) % 60
+                              )}m ${Math.floor((timeLeft / 1000) % 60)}s`}
+                            </div>
+                          ) : (
+                            <button
+                              className="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white py-1 px-2 rounded text-xs font-medium transition"
+                              onClick={() => router.push("/video_route")}
+                            >
+                              Go to Next Round
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <button
                       onClick={handleLogout}
@@ -242,11 +386,26 @@ export default function Navbar() {
                 </span>
               </div>
               <Link
-                href="/deposit"
-                className="block text-white hover:text-gray-400 py-2"
-                onClick={() => setMobileMenuOpen(false)}
+                href={depositLockLeft > 0 ? "#" : "/deposit"}
+                className={`px-4 py-2 rounded font-semibold transition ${
+                  depositLockLeft > 0
+                    ? "bg-gray-500 text-gray-300 cursor-not-allowed"
+                    : "bg-yellow-500 text-white hover:bg-yellow-400"
+                }`}
+                onClick={(e) => {
+                  if (depositLockLeft > 0) e.preventDefault();
+                }}
+                tabIndex={depositLockLeft > 0 ? -1 : 0}
               >
-                Deposit
+                {depositLockLeft > 0
+                  ? `Deposit after ${Math.ceil(
+                      depositLockLeft / (1000 * 60 * 60 * 24)
+                    )} ${
+                      Math.ceil(depositLockLeft / (1000 * 60 * 60 * 24)) === 1
+                        ? "day"
+                        : "days"
+                    }`
+                  : "Deposit"}
               </Link>
               <Link
                 href="/withdraw"

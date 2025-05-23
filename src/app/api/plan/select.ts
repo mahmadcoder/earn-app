@@ -1,15 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAuth, AuthRequest } from "@/app/api/auth/middleware";
 
-// TODO: Replace this with your actual authentication/session logic
-async function getUserId(): Promise<number | null> {
-  // Example: extract userId from session/cookie
-  // return req.session?.userId || null;
-  return 1; // <-- Replace with real user ID
-}
-
-export async function POST(req: NextRequest) {
-  const userId = await getUserId();
+export const POST = requireAuth(async (req: AuthRequest) => {
+  const userId = req.user?.id;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -33,4 +27,4 @@ export async function POST(req: NextRequest) {
   });
 
   return NextResponse.json({ success: true, progress });
-}
+});
