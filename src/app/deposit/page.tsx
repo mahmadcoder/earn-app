@@ -323,8 +323,14 @@ function DepositPage() {
     imageUrl: string;
     onClose: () => void;
   }) => {
+    const [dataUrl, setDataUrl] = useState<string | null>(null);
+    useEffect(() => {
+      if (!imageUrl) return;
+      fetch(imageUrl)
+        .then((res) => res.text())
+        .then(setDataUrl);
+    }, [imageUrl]);
     if (!imageUrl) return null;
-
     return (
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
         <div className="relative max-w-4xl w-full bg-gray-800 rounded-lg overflow-hidden">
@@ -334,12 +340,16 @@ function DepositPage() {
           >
             <X className="w-6 h-6" />
           </button>
-          <div className="relative w-full h-[80vh]">
-            <img
-              src={imageUrl}
-              alt="Payment Proof"
-              className="w-full h-full object-contain"
-            />
+          <div className="relative w-full h-[80vh] flex items-center justify-center">
+            {dataUrl ? (
+              <img
+                src={dataUrl}
+                alt="Payment Proof"
+                className="w-full h-full object-contain"
+              />
+            ) : (
+              <span className="text-white">Loading image...</span>
+            )}
           </div>
         </div>
       </div>
