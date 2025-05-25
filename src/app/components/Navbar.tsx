@@ -176,7 +176,7 @@ export default function Navbar() {
         <div className="flex items-center space-x-4">
           <Link href="/" className="flex items-center space-x-2">
             <Image
-              src="/P3.jpg"
+              src="/logo.jpg"
               alt="Logo"
               width={48}
               height={48}
