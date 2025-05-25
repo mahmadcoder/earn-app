@@ -181,6 +181,14 @@ export default function Navbar() {
       }
     };
     fetchDepositStatus();
+    // Listen for storage changes (login/logout in other tabs)
+    const handleStorage = () => {
+      fetchDepositStatus();
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+    };
   }, [isAuthenticated, getToken, user]);
 
   // Timer countdown
