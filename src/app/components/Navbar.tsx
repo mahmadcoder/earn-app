@@ -18,9 +18,9 @@ export default function Navbar() {
   const { user, isAuthenticated, logout, getToken } = useAuth();
   const [profit, setProfit] = useState<number | null>(null);
   const [profitLoading, setProfitLoading] = useState(false);
-  const [planProgress, setPlanProgress] = useState(null);
-  const [timeLeft, setTimeLeft] = useState(0);
-  const [depositLockLeft, setDepositLockLeft] = useState(0);
+  const [hasDeposited, setHasDeposited] = useState(false);
+  const [canStartTask, setCanStartTask] = useState(true);
+  const [timer, setTimer] = useState(0);
   const router = useRouter();
 
   const toggleMobileMenu = () => setMobileMenuOpen((prev) => !prev);
@@ -113,53 +113,45 @@ export default function Navbar() {
           data.progresses &&
           data.progresses.length > 0
         ) {
-          // Use the most recent plan
-          setPlanProgress(data.progresses[0]);
+          setHasDeposited(true);
+          // Check if user can start a new task (after 12am)
+          const lastRoundDate = data.progresses[0].lastRoundDate;
+          if (lastRoundDate) {
+            const lastRound = new Date(lastRoundDate);
+            const now = new Date();
+            // Next eligible time is next 12am after lastRound
+            const next12am = new Date(lastRound);
+            next12am.setHours(24, 0, 0, 0);
+            if (now < next12am) {
+              setCanStartTask(false);
+              setTimer(next12am.getTime() - now.getTime());
+            } else {
+              setCanStartTask(true);
+              setTimer(0);
+            }
+          } else {
+            setCanStartTask(true);
+            setTimer(0);
+          }
         } else {
-          setPlanProgress(null);
+          setHasDeposited(false);
         }
       } catch {
-        setPlanProgress(null);
+        setHasDeposited(false);
       }
     };
     fetchPlanProgress();
   }, [isAuthenticated, getToken]);
 
-  // Calculate time left for next round
+  // Timer countdown
   useEffect(() => {
-    if (!planProgress || !planProgress.lastRoundDate) {
-      setTimeLeft(0);
-      return;
+    if (!canStartTask && timer > 0) {
+      const interval = setInterval(() => {
+        setTimer((prev) => (prev > 1000 ? prev - 1000 : 0));
+      }, 1000);
+      return () => clearInterval(interval);
     }
-    const lastRound = new Date(planProgress.lastRoundDate);
-    const nextTime = new Date(lastRound.getTime() + 24 * 60 * 60 * 1000);
-    const update = () => {
-      const now = new Date();
-      const diff = nextTime.getTime() - now.getTime();
-      setTimeLeft(diff > 0 ? diff : 0);
-    };
-    update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [planProgress]);
-
-  // Calculate time left for 30-day deposit lock
-  useEffect(() => {
-    if (!planProgress || !planProgress.lastRoundDate) {
-      setDepositLockLeft(0);
-      return;
-    }
-    const lastPlan = new Date(planProgress.lastRoundDate);
-    const unlockTime = new Date(lastPlan.getTime() + 30 * 24 * 60 * 60 * 1000);
-    const update = () => {
-      const now = new Date();
-      const diff = unlockTime.getTime() - now.getTime();
-      setDepositLockLeft(diff > 0 ? diff : 0);
-    };
-    update();
-    const interval = setInterval(update, 1000 * 60); // update every minute
-    return () => clearInterval(interval);
-  }, [planProgress]);
+  }, [canStartTask, timer]);
 
   // Close profile dropdown when clicking outside
   const handleClickOutside = (e: MouseEvent) => {
@@ -217,29 +209,34 @@ export default function Navbar() {
         {/* Auth Buttons or User Profile */}
         <div className="hidden md:flex items-center space-x-4">
           {isAuthenticated ? (
-            <div className="flex items-center space-x-4">
-              <Link
-                href={depositLockLeft > 0 ? "#" : "/deposit"}
-                className={`px-4 py-2 rounded font-semibold transition ${
-                  depositLockLeft > 0
-                    ? "bg-gray-500 text-gray-300 cursor-not-allowed"
-                    : "bg-yellow-500 text-white hover:bg-yellow-400"
-                }`}
-                onClick={(e) => {
-                  if (depositLockLeft > 0) e.preventDefault();
-                }}
-                tabIndex={depositLockLeft > 0 ? -1 : 0}
-              >
-                {depositLockLeft > 0
-                  ? `Deposit after ${Math.ceil(
-                      depositLockLeft / (1000 * 60 * 60 * 24)
-                    )} ${
-                      Math.ceil(depositLockLeft / (1000 * 60 * 60 * 24)) === 1
-                        ? "day"
-                        : "days"
-                    }`
-                  : "Deposit"}
-              </Link>
+            <>
+              {/* Start Task or Deposit Button (Desktop) */}
+              {!hasDeposited ? (
+                <button
+                  onClick={() => router.push("/deposit")}
+                  className="px-4 py-2 rounded font-semibold transition bg-yellow-500 text-white hover:bg-yellow-400"
+                >
+                  Deposit
+                </button>
+              ) : (
+                <button
+                  onClick={() => canStartTask && router.push("/video_route")}
+                  className={`px-4 py-2 rounded font-semibold transition ${
+                    canStartTask
+                      ? "bg-blue-600 text-white hover:bg-blue-700"
+                      : "bg-gray-500 text-gray-300 cursor-not-allowed"
+                  }`}
+                  disabled={!canStartTask}
+                >
+                  {canStartTask
+                    ? "Start Task"
+                    : `Start Task after ${Math.floor(
+                        timer / (1000 * 60 * 60)
+                      )}h ${Math.floor(
+                        (timer / (1000 * 60)) % 60
+                      )}m ${Math.floor((timer / 1000) % 60)}s`}
+                </button>
+              )}
               <Link
                 href="/withdraw"
                 className="text-white bg-green-500 px-4 py-2 rounded hover:bg-green-400"
@@ -281,28 +278,6 @@ export default function Navbar() {
                         {user?.name}
                       </p>
                       <p className="text-sm text-gray-500">{user?.email}</p>
-                      {/* Next round timer/button */}
-                      {planProgress && planProgress.lastRoundDate && (
-                        <div className="mt-2">
-                          {timeLeft > 0 ? (
-                            <div className="text-xs text-blue-600">
-                              Next round active in:{" "}
-                              {`${Math.floor(
-                                timeLeft / (1000 * 60 * 60)
-                              )}h ${Math.floor(
-                                (timeLeft / (1000 * 60)) % 60
-                              )}m ${Math.floor((timeLeft / 1000) % 60)}s`}
-                            </div>
-                          ) : (
-                            <button
-                              className="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white py-1 px-2 rounded text-xs font-medium transition"
-                              onClick={() => router.push("/video_route")}
-                            >
-                              Go to Next Round
-                            </button>
-                          )}
-                        </div>
-                      )}
                     </div>
                     <button
                       onClick={handleLogout}
@@ -313,7 +288,7 @@ export default function Navbar() {
                   </div>
                 )}
               </div>
-            </div>
+            </>
           ) : (
             <>
               <Link
@@ -385,28 +360,33 @@ export default function Navbar() {
                   {profitLoading ? "Profit: ..." : `Profit: $${profit ?? 0}`}
                 </span>
               </div>
-              <Link
-                href={depositLockLeft > 0 ? "#" : "/deposit"}
-                className={`px-4 py-2 rounded font-semibold transition ${
-                  depositLockLeft > 0
-                    ? "bg-gray-500 text-gray-300 cursor-not-allowed"
-                    : "bg-yellow-500 text-white hover:bg-yellow-400"
-                }`}
-                onClick={(e) => {
-                  if (depositLockLeft > 0) e.preventDefault();
-                }}
-                tabIndex={depositLockLeft > 0 ? -1 : 0}
-              >
-                {depositLockLeft > 0
-                  ? `Deposit after ${Math.ceil(
-                      depositLockLeft / (1000 * 60 * 60 * 24)
-                    )} ${
-                      Math.ceil(depositLockLeft / (1000 * 60 * 60 * 24)) === 1
-                        ? "day"
-                        : "days"
-                    }`
-                  : "Deposit"}
-              </Link>
+              {/* Start Task or Deposit Button */}
+              {!hasDeposited ? (
+                <button
+                  onClick={() => router.push("/deposit")}
+                  className="px-4 py-2 rounded font-semibold transition bg-yellow-500 text-white hover:bg-yellow-400"
+                >
+                  Deposit
+                </button>
+              ) : (
+                <button
+                  onClick={() => canStartTask && router.push("/video_route")}
+                  className={`px-4 py-2 rounded font-semibold transition ${
+                    canStartTask
+                      ? "bg-blue-600 text-white hover:bg-blue-700"
+                      : "bg-gray-500 text-gray-300 cursor-not-allowed"
+                  }`}
+                  disabled={!canStartTask}
+                >
+                  {canStartTask
+                    ? "Start Task"
+                    : `Start Task after ${Math.floor(
+                        timer / (1000 * 60 * 60)
+                      )}h ${Math.floor(
+                        (timer / (1000 * 60)) % 60
+                      )}m ${Math.floor((timer / 1000) % 60)}s`}
+                </button>
+              )}
               <Link
                 href="/withdraw"
                 className="block text-white hover:text-gray-400 py-2"

@@ -1,19 +1,73 @@
-'use client';
-import Image from 'next/image';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation'; // <-- Router import
+"use client";
+import Image from "next/image";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 
 export default function AccountsPage() {
-  const [showDepositInfo, setShowDepositInfo] = useState(false);
-  const router = useRouter(); // <-- Router object
+  const router = useRouter();
+  const { user, getToken } = useAuth();
+  const [hasDeposited, setHasDeposited] = useState(false);
+  const [canStartTask, setCanStartTask] = useState(true);
+  const [timer, setTimer] = useState(0);
 
-  const handleDepositClick = () => {
-    if (!showDepositInfo) {
-      setShowDepositInfo(true); // Pehli click - Info show
-    } else {
-      router.push('/deposit'); // Doosri click - Redirect to /deposit
+  // Check if user has deposited
+  useEffect(() => {
+    const fetchPlanProgress = async () => {
+      if (!user || !getToken()) return;
+      try {
+        const res = await fetch(`/api/plan/all-progress`, {
+          headers: {
+            Authorization: `Bearer ${getToken()}`,
+            "Content-Type": "application/json",
+          },
+        });
+        const data = await res.json();
+        if (
+          res.ok &&
+          data.success &&
+          data.progresses &&
+          data.progresses.length > 0
+        ) {
+          setHasDeposited(true);
+          // Check if user can start a new task (after 12am)
+          const lastRoundDate = data.progresses[0].lastRoundDate;
+          if (lastRoundDate) {
+            const lastRound = new Date(lastRoundDate);
+            const now = new Date();
+            // Next eligible time is next 12am after lastRound
+            const next12am = new Date(lastRound);
+            next12am.setHours(24, 0, 0, 0);
+            if (now < next12am) {
+              setCanStartTask(false);
+              setTimer(next12am.getTime() - now.getTime());
+            } else {
+              setCanStartTask(true);
+              setTimer(0);
+            }
+          } else {
+            setCanStartTask(true);
+            setTimer(0);
+          }
+        } else {
+          setHasDeposited(false);
+        }
+      } catch {
+        setHasDeposited(false);
+      }
+    };
+    fetchPlanProgress();
+  }, [user, getToken]);
+
+  // Timer countdown
+  useEffect(() => {
+    if (!canStartTask && timer > 0) {
+      const interval = setInterval(() => {
+        setTimer((prev) => (prev > 1000 ? prev - 1000 : 0));
+      }, 1000);
+      return () => clearInterval(interval);
     }
-  };
+  }, [canStartTask, timer]);
 
   return (
     <section className="bg-gray-900 min-h-screen py-12 px-6">
@@ -23,7 +77,8 @@ export default function AccountsPage() {
           Crypto Wallet Account
         </h1>
         <p className="text-center text-white max-w-3xl mx-auto mb-12">
-          Securely manage your cryptocurrency with Binance. Fast, reliable, and global.
+          Securely manage your cryptocurrency with Binance. Fast, reliable, and
+          global.
         </p>
 
         {/* Binance Container */}
@@ -42,28 +97,36 @@ export default function AccountsPage() {
               Binance
             </h2>
             <p className="text-gray-600 text-center text-sm sm:text-base mb-4">
-              Binance is the world’s leading cryptocurrency exchange, offering secure and fast crypto transactions.
+              Binance is the worlds leading cryptocurrency exchange, offering
+              secure and fast crypto transactions.
             </p>
 
-            {/* Deposit Button */}
-            <button
-              onClick={handleDepositClick}
-              className="block w-full text-center bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-400 transition"
-            >
-              {showDepositInfo ? 'Proceed to Deposit' : 'Deposit'}
-            </button>
-
-            {/* Deposit Information */}
-            {showDepositInfo && (
-              <div className="mt-6 bg-gray-100 p-4 rounded text-center">
-                <p className="text-gray-700 text-sm mb-2">
-                  <strong>Network:</strong> TRC20
-                </p>
-                
-                <p className="text-red-500 text-xs mt-2">
-                  ⚠️ Send only USDT via TRC20 network. Wrong network = funds lost!
-                </p>
-              </div>
+            {/* Start Task or Deposit Button */}
+            {!hasDeposited ? (
+              <button
+                onClick={() => router.push("/deposit")}
+                className="block w-full text-center bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-400 transition"
+              >
+                Deposit
+              </button>
+            ) : (
+              <button
+                onClick={() => canStartTask && router.push("/video_route")}
+                className={`block w-full text-center px-4 py-2 rounded transition font-semibold ${
+                  canStartTask
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    : "bg-gray-500 text-gray-300 cursor-not-allowed"
+                }`}
+                disabled={!canStartTask}
+              >
+                {canStartTask
+                  ? "Start Task"
+                  : `Start Task after ${Math.floor(
+                      timer / (1000 * 60 * 60)
+                    )}h ${Math.floor((timer / (1000 * 60)) % 60)}m ${Math.floor(
+                      (timer / 1000) % 60
+                    )}s`}
+              </button>
             )}
           </div>
         </div>

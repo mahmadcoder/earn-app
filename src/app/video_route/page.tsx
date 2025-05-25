@@ -78,10 +78,12 @@ const Videos = () => {
       return;
     }
     const lastRound = new Date(currentPlan.lastRoundDate);
-    const nextTime = new Date(lastRound.getTime() + 24 * 60 * 60 * 1000);
+    // Next eligible time is next 12am after lastRound
+    const next12am = new Date(lastRound);
+    next12am.setHours(24, 0, 0, 0);
     const update = () => {
       const now = new Date();
-      const diff = nextTime.getTime() - now.getTime();
+      const diff = next12am.getTime() - now.getTime();
       setTimeLeft(diff > 0 ? diff : 0);
     };
     update();
@@ -128,13 +130,15 @@ const Videos = () => {
         })
       );
       // Force refetch of all-progress to update Navbar and Withdraw
-      await fetch("/api/plan/all-progress", {
-        headers: {
-          Authorization: `Bearer ${getToken()}`,
-          "Content-Type": "application/json",
-        },
-      });
-      setShowMessage(true);
+      setTimeout(async () => {
+        await fetch("/api/plan/all-progress", {
+          headers: {
+            Authorization: `Bearer ${getToken()}`,
+            "Content-Type": "application/json",
+          },
+        });
+        setShowMessage(true);
+      }, 500);
     } catch (error: unknown) {
       console.error("[COMPLETE ROUND] Error:", error);
       const errorMessage =
@@ -193,7 +197,7 @@ const Videos = () => {
             ⏳ Next Round Locked
           </h2>
           <p className="text-white mb-2">
-            You can watch the next round after 24 hours from your last round.
+            You can watch the next round after 12am (date change).
           </p>
           <div className="text-blue-400 text-lg font-mono mb-4">
             {`${Math.floor(timeLeft / (1000 * 60 * 60))}h ${Math.floor(
@@ -225,9 +229,9 @@ const Videos = () => {
                 {(() => {
                   const roundNumber =
                     currentPlan.roundCount + (roundCompleted ? 0 : 1);
-                  // If round just completed, show next round as 'active after 24 hours'
+                  // If round just completed, show next round as 'active after 12am'
                   if (roundCompleted) {
-                    return `Round: ${roundNumber} (active after 24 hours)`;
+                    return `Round: ${roundNumber} (active after 12am)`;
                   }
                   return `Round: ${roundNumber}`;
                 })()}

@@ -14,7 +14,6 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import type { UserPlanProgress } from "../video_route/page";
 import ProtectedRoute from "@/app/components/ProtectedRoute";
 
 // Define types for deposit and stats
@@ -67,11 +66,7 @@ function DepositPage() {
     totalAmount: 0,
   });
   const [selectedProof, setSelectedProof] = useState<string | null>(null);
-  const [planProgress, setPlanProgress] = useState<UserPlanProgress | null>(
-    null
-  );
-  const [depositLockLeft, setDepositLockLeft] = useState(0);
-  const [timer, setTimer] = useState(0);
+  const [hasDeposited, setHasDeposited] = useState(false);
 
   const walletAddresses = {
     USDT: "TJuZCvYANND2emRa4ssrWqpZswPFUaJVWQ",
@@ -114,7 +109,7 @@ function DepositPage() {
     }
   }, [user]);
 
-  // 30-day deposit lock logic
+  // Check if user has already deposited
   useEffect(() => {
     const fetchPlanProgress = async () => {
       if (!user || !getToken()) return;
@@ -132,43 +127,16 @@ function DepositPage() {
           data.progresses &&
           data.progresses.length > 0
         ) {
-          setPlanProgress(data.progresses[0]);
+          setHasDeposited(true);
         } else {
-          setPlanProgress(null);
+          setHasDeposited(false);
         }
       } catch {
-        setPlanProgress(null);
+        setHasDeposited(false);
       }
     };
     fetchPlanProgress();
   }, [user, getToken]);
-
-  useEffect(() => {
-    if (!planProgress || !planProgress.lastRoundDate) {
-      setDepositLockLeft(0);
-      return;
-    }
-    const lastPlan = new Date(planProgress.lastRoundDate);
-    const unlockTime = new Date(lastPlan.getTime() + 30 * 24 * 60 * 60 * 1000);
-    const update = () => {
-      const now = new Date();
-      const diff = unlockTime.getTime() - now.getTime();
-      setDepositLockLeft(diff > 0 ? diff : 0);
-    };
-    update();
-    const interval = setInterval(update, 1000 * 60);
-    return () => clearInterval(interval);
-  }, [planProgress]);
-
-  useEffect(() => {
-    setTimer(depositLockLeft);
-    if (depositLockLeft > 0) {
-      const interval = setInterval(() => {
-        setTimer((prev) => (prev > 1000 ? prev - 1000 : 0));
-      }, 1000);
-      return () => clearInterval(interval);
-    }
-  }, [depositLockLeft]);
 
   const handleSubmitDeposit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -237,11 +205,12 @@ function DepositPage() {
       setTransactionHash("");
       setAmount("");
       setPaymentProof(null);
-
-      // Redirect to confirmation page
-      router.push(
-        `/deposit/confirm?amount=${amount}&currency=${selectedCoin}&txHash=${transactionHash}`
-      );
+      // Debug log for deposit API response
+      console.log("Deposit API response:", data);
+      // Wait 500ms before reload to ensure backend updates
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
@@ -356,24 +325,17 @@ function DepositPage() {
     );
   };
 
-  // If user is not eligible to deposit, show timer and block content
-  if (depositLockLeft > 0) {
+  if (hasDeposited) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 p-6">
         <div className="bg-gray-800 p-8 rounded-lg shadow-lg text-center">
-          <h2 className="text-2xl font-bold text-yellow-400 mb-4">
-            ⏳ Deposit Locked
+          <h2 className="text-2xl font-bold text-green-400 mb-4">
+            Deposit Complete
           </h2>
           <p className="text-white mb-2">
-            You can deposit again after 30 days from your last deposit.
+            You have already made a deposit. Only one deposit is allowed per
+            user.
           </p>
-          <div className="text-blue-400 text-lg font-mono mb-4">
-            {`${Math.floor(timer / (1000 * 60 * 60 * 24))}d ${Math.floor(
-              (timer / (1000 * 60 * 60)) % 24
-            )}h ${Math.floor((timer / (1000 * 60)) % 60)}m ${Math.floor(
-              (timer / 1000) % 60
-            )}s`}
-          </div>
           <button
             onClick={() => router.push("/")}
             className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded-lg font-medium transition"
@@ -427,17 +389,6 @@ function DepositPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-gray-800 rounded-2xl shadow-xl p-6">
               <h2 className="text-xl font-semibold mb-4">Deposit Details</h2>
-              {depositLockLeft > 0 ? (
-                <div className="mb-6 p-4 bg-yellow-900/40 border border-yellow-600 rounded-lg text-yellow-300 text-center">
-                  {`Deposit after ${Math.ceil(
-                    depositLockLeft / (1000 * 60 * 60 * 24)
-                  )} ${
-                    Math.ceil(depositLockLeft / (1000 * 60 * 60 * 24)) === 1
-                      ? "day"
-                      : "days"
-                  }`}
-                </div>
-              ) : null}
               <form onSubmit={handleSubmitDeposit}>
                 <label className="block mb-2 font-medium text-sm">
                   Select Coin
@@ -535,9 +486,9 @@ function DepositPage() {
 
                 <button
                   type="submit"
-                  disabled={loading || depositLockLeft > 0}
+                  disabled={loading || hasDeposited}
                   className={`w-full ${
-                    loading || depositLockLeft > 0
+                    loading || hasDeposited
                       ? "bg-blue-800 cursor-not-allowed"
                       : "bg-blue-600 hover:bg-blue-700"
                   } text-white py-3 rounded font-semibold flex items-center justify-center`}
@@ -547,14 +498,8 @@ function DepositPage() {
                       <Loader2 className="animate-spin mr-2 h-5 w-5" />
                       Processing...
                     </>
-                  ) : depositLockLeft > 0 ? (
-                    `Deposit after ${Math.ceil(
-                      depositLockLeft / (1000 * 60 * 60 * 24)
-                    )} ${
-                      Math.ceil(depositLockLeft / (1000 * 60 * 60 * 24)) === 1
-                        ? "day"
-                        : "days"
-                    }`
+                  ) : hasDeposited ? (
+                    "Deposit Complete"
                   ) : (
                     "Submit Deposit"
                   )}

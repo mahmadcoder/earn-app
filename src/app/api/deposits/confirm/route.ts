@@ -22,21 +22,18 @@ async function confirmDeposit(request: AuthRequest) {
       );
     }
 
-    // Prevent deposit if user has a plan and 30 days have not passed
+    // Prevent deposit if user already has a plan (only one deposit allowed)
     const existingPlan = await prisma.userPlanProgress.findFirst({
       where: { userId: Number(userId) },
-      orderBy: { lastRoundDate: "desc" },
     });
-    if (existingPlan && existingPlan.lastRoundDate) {
-      const lastPlan = new Date(existingPlan.lastRoundDate);
-      const unlockTime = new Date(lastPlan.getTime() + 30 * 24 * 60 * 60 * 1000);
-      if (new Date() < unlockTime) {
-        const daysLeft = Math.ceil((unlockTime.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-        return NextResponse.json(
-          { message: `You can only deposit after ${daysLeft} day${daysLeft === 1 ? '' : 's'}` },
-          { status: 400 }
-        );
-      }
+    if (existingPlan) {
+      return NextResponse.json(
+        {
+          message:
+            "You have already made a deposit. Only one deposit is allowed per user.",
+        },
+        { status: 400 }
+      );
     }
 
     // Create deposit record

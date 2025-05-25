@@ -61,6 +61,7 @@ function WithdrawPage() {
   });
   const [historyLoading, setHistoryLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("withdraw"); // withdraw or history
+  const [availableBalance, setAvailableBalance] = useState(0);
 
   // Backend eligibility check for withdrawal
   // Update in withdraw page
@@ -157,6 +158,54 @@ function WithdrawPage() {
     }
   }, [searchParams, fetchWithdrawalHistory]);
 
+  // Fetch available balance
+  useEffect(() => {
+    const fetchBalance = async () => {
+      try {
+        const res = await fetch("/api/plan/all-progress", {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        const data = await res.json();
+        if (res.ok && data.totalProfit !== undefined) {
+          setAvailableBalance(data.totalProfit);
+        }
+      } catch {}
+    };
+    fetchBalance();
+  }, [getToken]);
+
+  // After a successful withdrawal, update balance and stats
+  useEffect(() => {
+    if (message) {
+      // Refetch balance and withdrawal history
+      const fetchBalance = async () => {
+        try {
+          const res = await fetch("/api/plan/all-progress", {
+            headers: { Authorization: `Bearer ${getToken()}` },
+          });
+          const data = await res.json();
+          if (res.ok && data.totalProfit !== undefined) {
+            setAvailableBalance(data.totalProfit);
+          }
+        } catch {}
+      };
+      fetchBalance();
+      fetchWithdrawalHistory();
+    }
+  }, [message, getToken, fetchWithdrawalHistory]);
+
+  // Validate amount on change
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setAmount(e.target.value);
+    setError("");
+    const val = parseFloat(e.target.value);
+    if (!isNaN(val) && val > availableBalance) {
+      setError(
+        "Insufficient balance. Your available balance is $" + availableBalance
+      );
+    }
+  };
+
   const handleWithdraw = () => {
     if (!address.trim()) {
       setError("Please enter a valid recipient address");
@@ -165,6 +214,13 @@ function WithdrawPage() {
 
     if (!amount || parseFloat(amount) <= 0) {
       setError("Please enter a valid amount");
+      return;
+    }
+
+    if (parseFloat(amount) > availableBalance) {
+      setError(
+        "Insufficient balance. Your available balance is $" + availableBalance
+      );
       return;
     }
 
@@ -282,14 +338,21 @@ function WithdrawPage() {
                 placeholder="Enter wallet address"
               />
 
-              <label className="block mb-2 text-sm font-medium">Amount</label>
+              <label className="block mb-2 font-medium text-sm">
+                Amount to Withdraw
+              </label>
               <input
                 type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="w-full mb-4 p-3 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Enter amount"
+                value={amount}
+                onChange={handleAmountChange}
+                className="w-full p-3 rounded bg-gray-700 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                min="0"
+                step="0.01"
               />
+              <p className="text-xs text-gray-400 mb-2">
+                Available Balance: ${availableBalance}
+              </p>
 
               {message && (
                 <div className="mb-4 p-3 bg-green-900/50 border border-green-700 rounded-lg">
