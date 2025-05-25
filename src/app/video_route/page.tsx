@@ -35,6 +35,10 @@ const Videos = () => {
   const [lastProfit, setLastProfit] = useState<number>(0);
   const [roundCompleted, setRoundCompleted] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
+  const [depositStatus, setDepositStatus] = useState<
+    null | "pending" | "confirmed" | "rejected"
+  >(null);
+  const [showRejectedModal, setShowRejectedModal] = useState(false);
 
   // Fetch user's active plan on component mount
   useEffect(() => {
@@ -90,6 +94,43 @@ const Videos = () => {
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
   }, [currentPlan]);
+
+  // Fetch deposit status for the user
+  useEffect(() => {
+    const fetchDepositStatus = async () => {
+      if (!user || !getToken()) {
+        setDepositStatus(null);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/deposits/history?userId=${user.id}`, {
+          headers: {
+            Authorization: `Bearer ${getToken()}`,
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const latest = data.deposits?.[0];
+          if (!latest) {
+            setDepositStatus(null);
+          } else if (latest.status === "pending") {
+            setDepositStatus("pending");
+          } else if (latest.status === "confirmed") {
+            setDepositStatus("confirmed");
+          } else if (latest.status === "rejected") {
+            setDepositStatus("rejected");
+          } else {
+            setDepositStatus(null);
+          }
+        } else {
+          setDepositStatus(null);
+        }
+      } catch {
+        setDepositStatus(null);
+      }
+    };
+    fetchDepositStatus();
+  }, [user, getToken]);
 
   // Update the completeRound function in video_route.tsx
   const completeRound = async () => {
@@ -210,6 +251,90 @@ const Videos = () => {
           >
             Go Back Home
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Block access if deposit is pending
+  if (depositStatus === "pending") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black">
+        <div className="bg-gray-900 p-8 rounded-lg shadow-lg text-center">
+          <h2 className="text-2xl font-bold text-yellow-400 mb-4">
+            Deposit Pending
+          </h2>
+          <p className="text-white mb-2">
+            Your deposit is pending. Please wait for confirmation by the admin
+            before you can start tasks.
+          </p>
+          <button
+            onClick={() => router.push("/")}
+            className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded-lg font-medium transition mt-4"
+          >
+            Go Back Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Block access if deposit is rejected
+  if (depositStatus === "rejected") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black">
+        <div className="bg-gray-900 p-8 rounded-lg shadow-lg text-center">
+          <h2 className="text-2xl font-bold text-red-400 mb-4">
+            Deposit Rejected
+          </h2>
+          <p className="text-white mb-4">
+            Unfortunately, your deposit was rejected. Please check your email
+            for the reason. If you have questions, contact our support team.
+          </p>
+          <button
+            onClick={() => setShowRejectedModal(true)}
+            className="bg-red-600 hover:bg-red-700 text-white py-2 px-6 rounded-lg font-medium transition mt-2"
+          >
+            ❌ Why was my deposit rejected?
+          </button>
+          <button
+            onClick={() => router.push("/")}
+            className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded-lg font-medium transition mt-4 ml-2"
+          >
+            Go Back Home
+          </button>
+          {showRejectedModal && (
+            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-70 z-50">
+              <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center relative">
+                <button
+                  onClick={() => setShowRejectedModal(false)}
+                  className="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold"
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+                <div className="text-4xl mb-4">❌📧</div>
+                <h3 className="text-xl font-bold text-red-600 mb-2">
+                  Deposit Rejected
+                </h3>
+                <p className="text-gray-800 mb-4">
+                  We have sent you an email with the reason for your deposit
+                  rejection.
+                  <br />
+                  <span className="text-gray-600">
+                    If you have any questions or need help, please contact our
+                    support team. We&#39;re here to help! 😊
+                  </span>
+                </p>
+                <button
+                  onClick={() => setShowRejectedModal(false)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded-lg font-medium transition"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
