@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(
   request: Request,
@@ -17,25 +17,40 @@ export async function GET(
     });
 
     if (!fileData) {
-      console.warn(`[File Not Found] File with ID ${id} was not found in the database`);
-      return NextResponse.json({ error: 'File not found' }, { status: 404 });
+      console.warn(
+        `[File Not Found] File with ID ${id} was not found in the database`
+      );
+      return NextResponse.json({ error: "File not found" }, { status: 404 });
     }
 
-    console.log(`[File Served] Successfully served file: ${id}, type: ${fileData.fileType}`);
+    // Support both old (data URL) and new (raw base64) formats
+    let base64 = fileData.fileData;
+    if (base64.startsWith("data:")) {
+      base64 = base64.split(",")[1];
+    }
+    const buffer = Buffer.from(base64, "base64");
 
-    return new Response(fileData.fileData, {
+    console.log(
+      `[File Served] Successfully served file: ${id}, type: ${fileData.fileType}`
+    );
+
+    return new Response(buffer, {
       headers: {
-        'Content-Type': fileData.fileType,
-        'Cache-Control': 'public, max-age=31536000',
+        "Content-Type": fileData.fileType,
+        "Cache-Control": "public, max-age=31536000",
+        "Content-Disposition": `inline; filename="${fileData.fileName}"`,
       },
     });
   } catch (error) {
-    console.error('[File Service Error]', {
-      error: error instanceof Error ? error.message : 'Unknown error',
+    console.error("[File Service Error]", {
+      error: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,
       timestamp: new Date().toISOString(),
     });
 
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
   }
 }

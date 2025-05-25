@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import ProtectedRoute from "@/app/components/ProtectedRoute";
+import Image from "next/image";
 
 // Define types for deposit and stats
 
@@ -292,13 +293,6 @@ function DepositPage() {
     imageUrl: string;
     onClose: () => void;
   }) => {
-    const [dataUrl, setDataUrl] = useState<string | null>(null);
-    useEffect(() => {
-      if (!imageUrl) return;
-      fetch(imageUrl)
-        .then((res) => res.text())
-        .then(setDataUrl);
-    }, [imageUrl]);
     if (!imageUrl) return null;
     return (
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
@@ -310,15 +304,14 @@ function DepositPage() {
             <X className="w-6 h-6" />
           </button>
           <div className="relative w-full h-[80vh] flex items-center justify-center">
-            {dataUrl ? (
-              <img
-                src={dataUrl}
-                alt="Payment Proof"
-                className="w-full h-full object-contain"
-              />
-            ) : (
-              <span className="text-white">Loading image...</span>
-            )}
+            <Image
+              src={imageUrl}
+              alt="Payment Proof"
+              fill
+              className="object-contain"
+              sizes="(max-width: 768px) 100vw, 80vw"
+              priority
+            />
           </div>
         </div>
       </div>
@@ -518,10 +511,13 @@ function DepositPage() {
               </div>
 
               <div className="text-center mb-4">
-                <img
+                <Image
                   src={`https://api.qrserver.com/v1/create-qr-code/?data=${walletAddresses[selectedCoin]}&size=150x150`}
                   alt="QR Code"
+                  width={150}
+                  height={150}
                   className="mx-auto rounded"
+                  unoptimized
                 />
               </div>
 
@@ -558,7 +554,7 @@ function DepositPage() {
                 <p className="mb-2">⚠️ Important:</p>
                 <ul className="list-disc pl-5 space-y-1">
                   <li>Only send {selectedCoin} to this address</li>
-                  <li>Minimum deposit: 10 {selectedCoin}</li>
+                  <li>{`Minimum deposit: 50 ${selectedCoin}`}</li>
                   <li>Enter transaction hash after sending</li>
                   <li>Deposits are processed within 24 hours</li>
                 </ul>

@@ -1,7 +1,17 @@
-'use client';
+"use client";
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, getCurrentUser, isAuthenticated, login, logout, register, getUserProfile, initAuth, getToken } from '@/lib/auth';
+import React, { createContext, useContext, useEffect, useState } from "react";
+import {
+  User,
+  getCurrentUser,
+  isAuthenticated,
+  login,
+  logout,
+  register,
+  getUserProfile,
+  initAuth,
+  getToken,
+} from "@/lib/auth";
 
 interface AuthContextType {
   user: User | null;
@@ -17,11 +27,21 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+type AxiosErrorWithMessage = {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+};
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Initialize auth state
   useEffect(() => {
     const initializeAuth = async () => {
@@ -33,27 +53,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (localUser) {
             setUser(localUser);
           }
-          
+
           // Then try to fetch fresh data from API
           try {
             const profile = await getUserProfile();
             setUser(profile);
           } catch (error) {
-            console.error('Error fetching user profile:', error);
+            console.error("Error fetching user profile:", error);
             // If API call fails, we still have the localStorage data
           }
         }
       } catch (error) {
-        console.error('Auth initialization error:', error);
-        setError('Authentication error');
+        console.error("Auth initialization error:", error);
+        setError("Authentication error");
       } finally {
         setLoading(false);
       }
     };
-    
+
     initializeAuth();
   }, []);
-  
+
   // Login handler
   const handleLogin = async (email: string, password: string) => {
     try {
@@ -61,50 +81,72 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setError(null);
       const { user } = await login(email, password);
       setUser(user);
-    } catch (error: any) {
-      setError(error.response?.data?.message || 'Login failed');
+    } catch (error: unknown) {
+      if (
+        error &&
+        typeof error === "object" &&
+        "response" in error &&
+        (error as AxiosErrorWithMessage).response?.data?.message
+      ) {
+        setError((error as AxiosErrorWithMessage).response!.data!.message!);
+      } else {
+        setError("Login failed");
+      }
       throw error;
     } finally {
       setLoading(false);
     }
   };
-  
+
   // Register handler
-  const handleRegister = async (name: string, email: string, password: string) => {
+  const handleRegister = async (
+    name: string,
+    email: string,
+    password: string
+  ) => {
     try {
       setLoading(true);
       setError(null);
       const user = await register(name, email, password);
       setUser(user);
-    } catch (error: any) {
-      setError(error.response?.data?.message || 'Registration failed');
+    } catch (error: unknown) {
+      if (
+        error &&
+        typeof error === "object" &&
+        "response" in error &&
+        (error as AxiosErrorWithMessage).response?.data?.message
+      ) {
+        setError((error as AxiosErrorWithMessage).response!.data!.message!);
+      } else {
+        setError("Registration failed");
+      }
       throw error;
     } finally {
       setLoading(false);
     }
   };
-  
+
   // Logout handler
   const handleLogout = () => {
     logout();
     setUser(null);
   };
-  
+
   // Refresh user data
   const refreshUser = async () => {
     if (!isAuthenticated()) return;
-    
+
     try {
       setLoading(true);
       const profile = await getUserProfile();
       setUser(profile);
     } catch (error) {
-      console.error('Error refreshing user data:', error);
+      console.error("Error refreshing user data:", error);
     } finally {
       setLoading(false);
     }
   };
-  
+
   const value = {
     user,
     loading,
@@ -114,16 +156,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     register: handleRegister,
     logout: handleLogout,
     refreshUser,
-    getToken
+    getToken,
   };
-  
+
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };
