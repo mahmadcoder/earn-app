@@ -20,7 +20,10 @@ const Videos = () => {
   const { user, getToken } = useAuth();
 
   const videoUrls = [
-    "https://www.youtube.com/watch?v=LXb3EKWsInQ",
+    // youtube videos
+    "https://youtu.be/DsG7tU630pE?si=rB338lJMR7pVdv1f",
+    // "https://www.youtube.com/watch?v=4uJLLev3Ulg",
+    // "https://www.youtube.com/watch?v=LXb3EKWsInQ",
     // "https://www.youtube.com/watch?v=ScMzIvxBSi4",
     // "https://www.youtube.com/watch?v=3JZ_D3ELwOQ",
     // "https://www.youtube.com/watch?v=kJQP7kiw5Fk",
@@ -39,6 +42,7 @@ const Videos = () => {
     null | "pending" | "confirmed" | "rejected"
   >(null);
   const [showRejectedModal, setShowRejectedModal] = useState(false);
+  const [roundError, setRoundError] = useState("");
 
   // Fetch user's active plan on component mount
   useEffect(() => {
@@ -82,16 +86,26 @@ const Videos = () => {
       return;
     }
     const lastRound = new Date(currentPlan.lastRoundDate);
-    // Next eligible time is next 12am after lastRound
-    const next12am = new Date(lastRound);
-    next12am.setHours(24, 0, 0, 0);
-    const update = () => {
+    const now = new Date();
+    const nowDate = now.toISOString().slice(0, 10);
+    const lastRoundDate = lastRound.toISOString().slice(0, 10);
+    if (nowDate === lastRoundDate) {
+      // Calculate ms left until next UTC day
+      const nextDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+      setTimeLeft(nextDay.getTime() - now.getTime());
+    } else {
+      setTimeLeft(0);
+    }
+    const interval = setInterval(() => {
       const now = new Date();
-      const diff = next12am.getTime() - now.getTime();
-      setTimeLeft(diff > 0 ? diff : 0);
-    };
-    update();
-    const interval = setInterval(update, 1000);
+      const nowDate = now.toISOString().slice(0, 10);
+      if (nowDate === lastRoundDate) {
+        const nextDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+        setTimeLeft(nextDay.getTime() - now.getTime());
+      } else {
+        setTimeLeft(0);
+      }
+    }, 1000);
     return () => clearInterval(interval);
   }, [currentPlan]);
 
@@ -110,14 +124,15 @@ const Videos = () => {
         });
         if (res.ok) {
           const data = await res.json();
-          const latest = data.deposits?.[0];
-          if (!latest) {
-            setDepositStatus(null);
-          } else if (latest.status === "pending") {
-            setDepositStatus("pending");
-          } else if (latest.status === "confirmed") {
+          const deposits = data.deposits || [];
+          const confirmedDeposit = deposits.find(
+            (d) => d.status === "confirmed"
+          );
+          if (confirmedDeposit) {
             setDepositStatus("confirmed");
-          } else if (latest.status === "rejected") {
+          } else if (deposits.some((d) => d.status === "pending")) {
+            setDepositStatus("pending");
+          } else if (deposits.some((d) => d.status === "rejected")) {
             setDepositStatus("rejected");
           } else {
             setDepositStatus(null);
@@ -140,6 +155,7 @@ const Videos = () => {
     }
     try {
       setLastProfit(currentPlan.profit);
+      setRoundError("");
       console.log(
         "[COMPLETE ROUND] Sending request for planAmount:",
         currentPlan.planAmount
@@ -158,6 +174,7 @@ const Videos = () => {
       console.log("[COMPLETE ROUND] Response status:", response.status);
       console.log("[COMPLETE ROUND] Response data:", data);
       if (!response.ok) {
+        setRoundError(data.error || "Failed to complete round");
         throw new Error(data.error || "Failed to complete round");
       }
       setProgress(data.progress);
@@ -186,6 +203,7 @@ const Videos = () => {
         typeof error === "object" && error !== null && "message" in error
           ? (error as { message?: string }).message
           : "Failed to complete round";
+      setRoundError(errorMessage || "Failed to complete round");
       toast.error(errorMessage || "Failed to complete round");
       setShowMessage(true);
     }
@@ -436,6 +454,9 @@ const Videos = () => {
               </div>
             ) : (
               <p>Round processing... Please wait.</p>
+            )}
+            {showMessage && roundError && (
+              <div className="text-red-500 text-center mb-4">{roundError}</div>
             )}
           </div>
         )}

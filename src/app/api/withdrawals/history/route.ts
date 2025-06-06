@@ -1,51 +1,63 @@
-import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { requireAuth, AuthRequest } from '../../auth/middleware';
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { requireAuth, AuthRequest } from "../../auth/middleware";
 
 // Handler for GET requests (protected by auth)
 async function getWithdrawalHistory(request: AuthRequest) {
   try {
     // User is already authenticated via middleware
     const userId = request.user?.id;
-    
+
     // Get URL params
     const url = new URL(request.url);
-    const queryUserId = url.searchParams.get('userId');
-    
+    const queryUserId = url.searchParams.get("userId");
+
     // Ensure the user is only accessing their own withdrawals
     // or is an admin (for future admin functionality)
-    if (queryUserId && Number(queryUserId) !== userId && request.user?.email !== 'admin@gmail.com') {
+    if (
+      queryUserId &&
+      Number(queryUserId) !== userId &&
+      request.user?.email !== "admin@gmail.com"
+    ) {
       return NextResponse.json(
-        { message: 'Unauthorized access' },
+        { message: "Unauthorized access" },
         { status: 403 }
       );
     }
-    
+
     // Use the query user ID if provided, otherwise use the authenticated user's ID
     const targetUserId = queryUserId ? Number(queryUserId) : userId;
-    
+
     // Get user withdrawals from database
     const withdrawals = await prisma.withdrawal.findMany({
       where: {
-        userId: targetUserId
+        userId: targetUserId,
       },
       orderBy: {
-        createdAt: 'desc'
-      }
+        createdAt: "desc",
+      },
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true,
+          },
+        },
+      },
     });
 
     // Get total withdrawal stats
     const stats = await prisma.withdrawal.groupBy({
-      by: ['status'],
+      by: ["status"],
       where: {
-        userId: targetUserId
+        userId: targetUserId,
       },
       _count: {
-        id: true
+        id: true,
       },
       _sum: {
-        amount: true
-      }
+        amount: true,
+      },
     });
 
     // Format stats for easier consumption
@@ -54,37 +66,40 @@ async function getWithdrawalHistory(request: AuthRequest) {
       pending: 0,
       completed: 0,
       rejected: 0,
-      totalAmount: 0
+      totalAmount: 0,
     };
 
-    stats.forEach(stat => {
+    stats.forEach((stat) => {
       const count = stat._count.id;
       const amount = stat._sum.amount || 0;
-      
+
       formattedStats.total += count;
       formattedStats.totalAmount += amount;
-      
+
       switch (stat.status.toLowerCase()) {
-        case 'pending':
+        case "pending":
           formattedStats.pending = count;
           break;
-         case 'confirm':
+        case "confirm":
           formattedStats.completed = count;
           break;
-        case 'reject':
+        case "reject":
           formattedStats.rejected = count;
           break;
       }
     });
 
-    return NextResponse.json({
-      withdrawals,
-      stats: formattedStats
-    }, { status: 200 });
-  } catch (error) {
-    console.error('Withdrawal history fetch error:', error);
     return NextResponse.json(
-      { message: 'Internal server error' },
+      {
+        withdrawals,
+        stats: formattedStats,
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error("Withdrawal history fetch error:", error);
+    return NextResponse.json(
+      { message: "Internal server error" },
       { status: 500 }
     );
   }

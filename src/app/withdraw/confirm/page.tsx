@@ -1,7 +1,13 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CheckCircle, AlertCircle, ArrowLeft, Loader2 } from "lucide-react";
+import {
+  CheckCircle,
+  AlertCircle,
+  ArrowLeft,
+  Loader2,
+  XCircle,
+} from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import ProtectedRoute from "@/app/components/ProtectedRoute";
 import { getToken } from "@/lib/auth";
@@ -14,10 +20,66 @@ export default function WithdrawConfirmWrapper() {
   );
 }
 
+function WithdrawalPopup({
+  open,
+  onClose,
+  status,
+  amount,
+  currency,
+  date,
+  address,
+}) {
+  if (!open) return null;
+  const isConfirmed = status === "confirm";
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+      <div className="bg-gray-900 rounded-2xl shadow-2xl p-8 max-w-sm w-full text-center relative">
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 text-gray-400 hover:text-white text-2xl"
+        >
+          ×
+        </button>
+        <div className="flex flex-col items-center mb-4">
+          {isConfirmed ? (
+            <CheckCircle className="w-16 h-16 text-green-400 mb-2" />
+          ) : (
+            <XCircle className="w-16 h-16 text-red-400 mb-2" />
+          )}
+          <h2
+            className={`text-2xl font-bold mb-2 ${
+              isConfirmed ? "text-green-400" : "text-red-400"
+            }`}
+          >
+            Withdrawal {isConfirmed ? "Confirm" : "Reject"}
+          </h2>
+        </div>
+        <div className="text-lg mb-2">
+          <span className="font-semibold">Amount:</span> {amount} {currency}
+        </div>
+        <div className="text-gray-400 mb-2">
+          <span className="font-semibold">Date:</span> {date}
+        </div>
+        {address && (
+          <div className="text-gray-400 mb-2">
+            <span className="font-semibold">To:</span> {address}
+          </div>
+        )}
+        <button
+          onClick={onClose}
+          className="mt-4 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function WithdrawConfirmPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
+  const { user, getToken: getTokenFromContext } = useAuth();
 
   // Get withdrawal details from URL params
   const amount = searchParams.get("amount") || "";
@@ -27,6 +89,9 @@ function WithdrawConfirmPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [popupOpen, setPopupOpen] = useState(false);
+  const [popupStatus, setPopupStatus] = useState("");
+  const [popupDate, setPopupDate] = useState("");
 
   // Validate that we have all required parameters
   useEffect(() => {
@@ -35,9 +100,45 @@ function WithdrawConfirmPage() {
     }
   }, [amount, currency, recipientAddress]);
 
+  // Show popup if latest withdrawal is confirm or rejected
+  useEffect(() => {
+    const fetchLatestWithdrawal = async () => {
+      if (!user?.id) return;
+      try {
+        const token = getTokenFromContext ? getTokenFromContext() : getToken();
+        const res = await fetch(`/api/withdrawals/history?userId=${user.id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (data.withdrawals && data.withdrawals.length > 0) {
+          const latest = data.withdrawals[0];
+          if (latest.status === "confirm" || latest.status === "rejected") {
+            setPopupStatus(latest.status);
+            setPopupDate(
+              new Date(latest.updatedAt || latest.createdAt).toLocaleString()
+            );
+            setPopupOpen(true);
+            // Optionally update amount, currency, address if you want to show the latest
+            // setAmount(latest.amount);
+            // setCurrency(latest.currency);
+            // setRecipientAddress(latest.recipientAddress);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    };
+    fetchLatestWithdrawal();
+    // Only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleConfirmWithdrawal = async () => {
     if (!user?.id) {
       setError("You must be logged in to confirm a withdrawal");
+      setPopupStatus("rejected");
+      setPopupDate(new Date().toLocaleString());
+      setPopupOpen(true);
       return;
     }
 
@@ -62,12 +163,20 @@ function WithdrawConfirmPage() {
 
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.message || "Withdrawal request failed");
+      if (!res.ok) {
+        setPopupStatus("rejected");
+        setPopupDate(new Date().toLocaleString());
+        setPopupOpen(true);
+        throw new Error(data.message || "Withdrawal request failed");
+      }
 
       setTimeout(() => {
         setMessage(
           data.message || "Withdrawal request submitted successfully!"
         );
+        setPopupStatus("confirm");
+        setPopupDate(new Date().toLocaleString());
+        setPopupOpen(true);
       }, 500);
     } catch (err: unknown) {
       let errorMsg = "An unknown error occurred";
@@ -91,6 +200,15 @@ function WithdrawConfirmPage() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-6">
+      <WithdrawalPopup
+        open={popupOpen}
+        onClose={() => setPopupOpen(false)}
+        status={popupStatus}
+        amount={amount}
+        currency={currency}
+        date={popupDate}
+        address={recipientAddress}
+      />
       <div className="max-w-md mx-auto">
         <button
           onClick={handleBackToWithdraw}

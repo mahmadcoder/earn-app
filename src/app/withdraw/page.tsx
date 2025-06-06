@@ -39,6 +39,75 @@ export default function WithdrawPageWrapper() {
   );
 }
 
+function WithdrawalPopup({
+  open,
+  onClose,
+  status,
+  amount,
+  currency,
+  date,
+  address,
+  onRefresh,
+  refreshing,
+}) {
+  if (!open) return null;
+  const isConfirmed = status === "confirm";
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+      <div className="bg-gray-900 rounded-2xl shadow-2xl p-8 max-w-sm w-full text-center relative">
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 text-gray-400 hover:text-white text-2xl"
+        >
+          ×
+        </button>
+        <div className="flex flex-col items-center mb-4">
+          {isConfirmed ? (
+            <CheckCircle className="w-16 h-16 text-green-400 mb-2" />
+          ) : (
+            <XCircle className="w-16 h-16 text-red-400 mb-2" />
+          )}
+          <h2
+            className={`text-2xl font-bold mb-2 ${
+              isConfirmed ? "text-green-400" : "text-red-400"
+            }`}
+          >
+            Withdrawal {isConfirmed ? "Confirm" : "Reject"}
+          </h2>
+        </div>
+        <div className="text-lg mb-2">
+          <span className="font-semibold">Amount:</span> {amount} {currency}
+        </div>
+        <div className="text-gray-400 mb-2">
+          <span className="font-semibold">Date:</span> {date}
+        </div>
+        {address && (
+          <div className="text-gray-400 mb-2">
+            <span className="font-semibold">To:</span> {address}
+          </div>
+        )}
+        <div className="flex flex-col gap-2 mt-4">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
+          >
+            Close
+          </button>
+          <button
+            onClick={onRefresh}
+            disabled={refreshing}
+            className={`px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium ${
+              refreshing ? "opacity-60 cursor-not-allowed" : ""
+            }`}
+          >
+            {refreshing ? "Refreshing..." : "Refresh"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function WithdrawPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -62,6 +131,13 @@ function WithdrawPage() {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("withdraw"); // withdraw or history
   const [availableBalance, setAvailableBalance] = useState(0);
+  const [popupOpen, setPopupOpen] = useState(false);
+  const [popupStatus, setPopupStatus] = useState("");
+  const [popupDate, setPopupDate] = useState("");
+  const [popupAmount, setPopupAmount] = useState("");
+  const [popupCurrency, setPopupCurrency] = useState("");
+  const [popupAddress, setPopupAddress] = useState("");
+  const [popupRefreshing, setPopupRefreshing] = useState(false);
 
   // Backend eligibility check for withdrawal
   // Update in withdraw page
@@ -75,10 +151,11 @@ function WithdrawPage() {
         });
         const data = await res.json();
         if (res.ok && Array.isArray(data.progresses)) {
+          const hasAnyRounds = data.progresses.some((p) => p.roundCount > 0);
           const eligible = data.progresses.some(
             (p) => p.canWithdraw && p.profit > 0 && p.roundCount > 0
           );
-          if (!eligible) {
+          if (!eligible && !hasAnyRounds) {
             router.push("/video_route?reason=complete_videos_first");
             // Force refetch to update state after redirect
             await fetch("/api/plan/all-progress", {
@@ -194,6 +271,66 @@ function WithdrawPage() {
     }
   }, [message, getToken, fetchWithdrawalHistory]);
 
+  // Refactored fetch logic for popup
+  const fetchLatestWithdrawalForPopup = useCallback(async () => {
+    if (!user?.id) return;
+    setPopupRefreshing(true);
+    try {
+      const res = await fetch(`/api/withdrawals/history?userId=${user.id}`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      const data = await res.json();
+      if (data.withdrawals && data.withdrawals.length > 0) {
+        const recent = data.withdrawals
+          .filter((w) => {
+            const status = w.status?.toLowerCase();
+            return (
+              status === "confirm" ||
+              status === "reject" ||
+              status === "pending"
+            );
+          })
+          .sort(
+            (a, b) =>
+              new Date(b.updatedAt || b.createdAt).getTime() -
+              new Date(a.updatedAt || a.createdAt).getTime()
+          )[0];
+        if (recent) {
+          setPopupStatus(recent.status);
+          setPopupDate(
+            new Date(recent.updatedAt || recent.createdAt).toLocaleString()
+          );
+          setPopupAmount(recent.amount);
+          setPopupCurrency(recent.currency);
+          setPopupAddress(recent.recipientAddress);
+          setPopupOpen(true);
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching withdrawals for popup:", err);
+    } finally {
+      setPopupRefreshing(false);
+    }
+  }, [user?.id, getToken]);
+
+  // Fetch on mount and when user changes
+  useEffect(() => {
+    fetchLatestWithdrawalForPopup();
+  }, [fetchLatestWithdrawalForPopup]);
+
+  // Fetch when page/tab becomes visible (user switches back to tab)
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchLatestWithdrawalForPopup();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [fetchLatestWithdrawalForPopup]);
+
   // Validate amount on change
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setAmount(e.target.value);
@@ -282,6 +419,17 @@ function WithdrawPage() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-6">
+      <WithdrawalPopup
+        open={popupOpen}
+        onClose={() => setPopupOpen(false)}
+        status={popupStatus}
+        amount={popupAmount}
+        currency={popupCurrency}
+        date={popupDate}
+        address={popupAddress}
+        onRefresh={fetchLatestWithdrawalForPopup}
+        refreshing={popupRefreshing}
+      />
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold mb-6 text-center">Withdraw Funds</h1>
 
@@ -341,15 +489,22 @@ function WithdrawPage() {
               <label className="block mb-2 font-medium text-sm">
                 Amount to Withdraw
               </label>
-              <input
-                type="number"
-                placeholder="Enter amount"
-                value={amount}
-                onChange={handleAmountChange}
-                className="w-full p-3 rounded bg-gray-700 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                min="0"
-                step="0.01"
-              />
+              {availableBalance < 10 ? (
+                <div className="w-full p-3 rounded bg-gray-700 mb-4 text-red-400 text-center border border-red-500 opacity-70 cursor-not-allowed">
+                  Your balance is less than $10. You cannot withdraw.
+                </div>
+              ) : (
+                <input
+                  type="number"
+                  placeholder="Enter amount"
+                  value={amount}
+                  onChange={handleAmountChange}
+                  className="w-full p-3 rounded bg-gray-700 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  min="0"
+                  step="0.01"
+                  disabled={availableBalance < 10}
+                />
+              )}
               <p className="text-xs text-gray-400 mb-2">
                 Available Balance: ${availableBalance}
               </p>
