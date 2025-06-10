@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
 import React from "react";
 import { useRouter } from "next/navigation";
+import StreakProgressBar from "./StreakProgressBar";
 
 const navbarLinks = [
   { href: "/", label: "Home" },
@@ -25,6 +26,8 @@ export default function Navbar() {
   const [timer, setTimer] = useState(0);
   const [showRejectedModal, setShowRejectedModal] = useState(false);
   const router = useRouter();
+  const [streak, setStreak] = useState(0);
+  const [roundCount, setRoundCount] = useState(0);
 
   const toggleMobileMenu = () => setMobileMenuOpen((prev) => !prev);
   const toggleProfile = () => setIsProfileOpen((prev) => !prev);
@@ -125,10 +128,18 @@ export default function Navbar() {
             const nowDate = now.toISOString().slice(0, 10);
             const lastRoundDateStr = lastRound.toISOString().slice(0, 10);
             if (nowDate === lastRoundDateStr) {
-              // Calculate ms left until next UTC day
-              const nextDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+              // Calculate ms left until next LOCAL day (local midnight)
+              const nextLocalMidnight = new Date(
+                now.getFullYear(),
+                now.getMonth(),
+                now.getDate() + 1,
+                0,
+                0,
+                0,
+                0
+              );
               setCanStartTask(false);
-              setTimer(nextDay.getTime() - now.getTime());
+              setTimer(nextLocalMidnight.getTime() - now.getTime());
             } else {
               setCanStartTask(true);
               setTimer(0);
@@ -137,9 +148,12 @@ export default function Navbar() {
             setCanStartTask(true);
             setTimer(0);
           }
+          setRoundCount(data.progresses[0].roundCount || 0);
         } else {
           setDepositStatus(null);
         }
+        // Set backend-driven streak
+        setStreak(data.dailyStreak || 0);
       } catch {
         setDepositStatus(null);
       }
@@ -370,12 +384,18 @@ export default function Navbar() {
                   </svg>
                 </button>
                 {isProfileOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-20">
-                    <div className="px-4 py-2 border-b border-gray-200">
-                      <p className="text-sm font-medium text-gray-900">
+                  <div className="absolute right-0 mt-2 w-72 min-w-[220px] max-w-xs bg-white rounded-md shadow-lg py-1 z-20">
+                    <div className="px-4 py-2 border-b border-gray-200 flex flex-col gap-2">
+                      <p className="text-sm font-medium text-gray-900 break-words">
                         {user?.name}
                       </p>
-                      <p className="text-sm text-gray-500">{user?.email}</p>
+                      <p className="text-sm text-gray-500 break-words">
+                        {user?.email}
+                      </p>
+                      <StreakProgressBar
+                        streak={streak}
+                        roundCount={roundCount}
+                      />
                     </div>
                     <button
                       onClick={handleLogout}

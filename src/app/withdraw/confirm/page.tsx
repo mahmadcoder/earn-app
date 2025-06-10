@@ -80,12 +80,12 @@ function WithdrawConfirmPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, getToken: getTokenFromContext } = useAuth();
-
+  
   // Get withdrawal details from URL params
   const amount = searchParams.get("amount") || "";
   const currency = searchParams.get("currency") || "USDT";
   const recipientAddress = searchParams.get("address") || "";
-
+  
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -141,7 +141,7 @@ function WithdrawConfirmPage() {
       setPopupOpen(true);
       return;
     }
-
+    
     setLoading(true);
     setMessage("");
     setError("");
@@ -150,7 +150,7 @@ function WithdrawConfirmPage() {
       const token = getToken();
       const res = await fetch("/api/withdrawals/submit", {
         method: "POST",
-        headers: {
+        headers: { 
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
@@ -210,14 +210,14 @@ function WithdrawConfirmPage() {
         address={recipientAddress}
       />
       <div className="max-w-md mx-auto">
-        <button
+        <button 
           onClick={handleBackToWithdraw}
           className="flex items-center text-gray-400 hover:text-white mb-6"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Withdraw
         </button>
-
+        
         <div className="bg-gray-800 rounded-2xl shadow-xl p-6">
           {error ? (
             <div className="mb-6 p-4 bg-red-900/50 border border-red-700 rounded-lg">
@@ -253,14 +253,14 @@ function WithdrawConfirmPage() {
                     {amount} {currency}
                   </p>
                 </div>
-
+                
                 <div className="bg-gray-700 p-4 rounded-lg">
                   <p className="text-gray-400 text-sm">Recipient Address</p>
                   <p className="text-sm font-medium break-all">
                     {recipientAddress}
                   </p>
                 </div>
-
+                
                 <div className="bg-gray-700 p-4 rounded-lg">
                   <p className="text-gray-400 text-sm">
                     Estimated Processing Time
@@ -300,14 +300,14 @@ function WithdrawConfirmPage() {
                       {amount} {currency}
                     </p>
                   </div>
-
+                  
                   <div className="bg-gray-700 p-4 rounded-lg">
                     <p className="text-gray-400 text-sm">Recipient Address</p>
                     <p className="text-sm font-medium break-all">
                       {recipientAddress}
                     </p>
                   </div>
-
+                  
                   <div className="bg-gray-700 p-4 rounded-lg">
                     <p className="text-gray-400 text-sm">
                       Estimated Processing Time
@@ -316,7 +316,7 @@ function WithdrawConfirmPage() {
                   </div>
                 </div>
               </div>
-
+              
               <div className="text-sm text-yellow-400 mb-6 p-4 bg-yellow-900/30 border border-yellow-800 rounded-lg">
                 <p className="mb-2 font-medium">⚠️ Important</p>
                 <ul className="list-disc pl-5 space-y-1 text-gray-300">
@@ -327,7 +327,7 @@ function WithdrawConfirmPage() {
                   </li>
                 </ul>
               </div>
-
+              
               <div className="flex space-x-4">
                 <button
                   onClick={handleBackToWithdraw}
@@ -335,7 +335,7 @@ function WithdrawConfirmPage() {
                 >
                   Cancel
                 </button>
-
+                
                 <button
                   onClick={handleConfirmWithdrawal}
                   disabled={loading}

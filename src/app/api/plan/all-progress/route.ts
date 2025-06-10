@@ -13,6 +13,8 @@ export const GET = requireAuth(async (req: AuthRequest) => {
       where: { userId: userId },
       orderBy: { lastRoundDate: "desc" },
     });
+    // Get user's streak info
+    const user = await prisma.user.findUnique({ where: { id: userId } });
     // Calculate total profit and check withdrawal eligibility
     const totalProfit = progresses.reduce((sum, p) => sum + (p.profit || 0), 0);
     const canWithdraw = progresses.some(
@@ -30,6 +32,8 @@ export const GET = requireAuth(async (req: AuthRequest) => {
       })),
       totalProfit,
       canWithdraw,
+      dailyStreak: user?.dailyStreak || 0,
+      lastStreakDate: user?.lastStreakDate || null,
     });
   } catch (error) {
     console.error("Error in all-progress API:", error);

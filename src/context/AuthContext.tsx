@@ -41,7 +41,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-
+  
   // Initialize auth state
   useEffect(() => {
     const initializeAuth = async () => {
@@ -53,7 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           if (localUser) {
             setUser(localUser);
           }
-
+          
           // Then try to fetch fresh data from API
           try {
             const profile = await getUserProfile();
@@ -70,10 +70,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         setLoading(false);
       }
     };
-
+    
     initializeAuth();
   }, []);
-
+  
   // Login handler
   const handleLogin = async (email: string, password: string) => {
     try {
@@ -97,7 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setLoading(false);
     }
   };
-
+  
   // Register handler
   const handleRegister = async (
     name: string,
@@ -125,17 +125,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setLoading(false);
     }
   };
-
+  
   // Logout handler
   const handleLogout = () => {
     logout();
     setUser(null);
   };
-
+  
   // Refresh user data
   const refreshUser = async () => {
     if (!isAuthenticated()) return;
-
+    
     try {
       setLoading(true);
       const profile = await getUserProfile();
@@ -146,7 +146,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setLoading(false);
     }
   };
-
+  
   const value = {
     user,
     loading,
@@ -158,7 +158,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     refreshUser,
     getToken,
   };
-
+  
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 

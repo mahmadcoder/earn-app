@@ -1,11 +1,12 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import ReactPlayer from "react-player";
 import ProtectedRoute from "../components/ProtectedRoute";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "react-hot-toast";
+import StreakProgressBar from "../components/StreakProgressBar";
 
 export type UserPlanProgress = {
   planAmount: number;
@@ -43,6 +44,8 @@ const Videos = () => {
   >(null);
   const [showRejectedModal, setShowRejectedModal] = useState(false);
   const [roundError, setRoundError] = useState("");
+  const [streak, setStreak] = useState(0);
+  const lastStreakDateRef = useRef<string | null>(null);
 
   // Fetch user's active plan on component mount
   useEffect(() => {
@@ -90,9 +93,17 @@ const Videos = () => {
     const nowDate = now.toISOString().slice(0, 10);
     const lastRoundDate = lastRound.toISOString().slice(0, 10);
     if (nowDate === lastRoundDate) {
-      // Calculate ms left until next UTC day
-      const nextDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
-      setTimeLeft(nextDay.getTime() - now.getTime());
+      // Calculate ms left until next LOCAL day (local midnight)
+      const nextLocalMidnight = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() + 1,
+        0,
+        0,
+        0,
+        0
+      );
+      setTimeLeft(nextLocalMidnight.getTime() - now.getTime());
     } else {
       setTimeLeft(0);
     }
@@ -100,8 +111,16 @@ const Videos = () => {
       const now = new Date();
       const nowDate = now.toISOString().slice(0, 10);
       if (nowDate === lastRoundDate) {
-        const nextDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
-        setTimeLeft(nextDay.getTime() - now.getTime());
+        const nextLocalMidnight = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate() + 1,
+          0,
+          0,
+          0,
+          0
+        );
+        setTimeLeft(nextLocalMidnight.getTime() - now.getTime());
       } else {
         setTimeLeft(0);
       }
@@ -146,6 +165,46 @@ const Videos = () => {
     };
     fetchDepositStatus();
   }, [user, getToken]);
+
+  // Fetch user's streak from localStorage (or backend if available)
+  useEffect(() => {
+    const streakData = localStorage.getItem("dailyStreak");
+    const lastStreakDate = localStorage.getItem("lastStreakDate");
+    if (streakData) setStreak(Number(streakData));
+    if (lastStreakDate) lastStreakDateRef.current = lastStreakDate;
+  }, []);
+
+  // Update streak on round completion
+  useEffect(() => {
+    if (roundCompleted && currentPlan?.lastRoundDate) {
+      const today = new Date().toISOString().slice(0, 10);
+      const lastStreakDate = lastStreakDateRef.current;
+      if (lastStreakDate === today) return; // Already counted today
+      if (lastStreakDate) {
+        const prev = new Date(lastStreakDate);
+        const diff =
+          (new Date(today).getTime() - prev.getTime()) / (1000 * 60 * 60 * 24);
+        if (diff === 1) {
+          setStreak((prev) => {
+            localStorage.setItem("dailyStreak", String(prev + 1));
+            localStorage.setItem("lastStreakDate", today);
+            lastStreakDateRef.current = today;
+            return prev + 1;
+          });
+        } else if (diff > 1) {
+          setStreak(1);
+          localStorage.setItem("dailyStreak", "1");
+          localStorage.setItem("lastStreakDate", today);
+          lastStreakDateRef.current = today;
+        }
+      } else {
+        setStreak(1);
+        localStorage.setItem("dailyStreak", "1");
+        localStorage.setItem("lastStreakDate", today);
+        lastStreakDateRef.current = today;
+      }
+    }
+  }, [roundCompleted, currentPlan?.lastRoundDate]);
 
   // Update the completeRound function in video_route.tsx
   const completeRound = async () => {
@@ -363,7 +422,7 @@ const Videos = () => {
       {/* Header with current progress */}
       {currentPlan && (
         <div className="w-full max-w-2xl mb-6 bg-gray-900 p-4 rounded-lg">
-          <div className="flex justify-between items-center text-white">
+          <div className="flex justify-between items-center text-white mb-2">
             <div>
               <h3 className="text-lg font-semibold">
                 Plan: ${currentPlan.planAmount}
@@ -372,7 +431,6 @@ const Videos = () => {
                 {(() => {
                   const roundNumber =
                     currentPlan.roundCount + (roundCompleted ? 0 : 1);
-                  // If round just completed, show next round as 'active after 12am'
                   if (roundCompleted) {
                     return `Round: ${roundNumber} (active after 12am)`;
                   }
@@ -389,6 +447,11 @@ const Videos = () => {
               </p>
             </div>
           </div>
+          {/* Daily Streak & Progress Bar */}
+          <StreakProgressBar
+            streak={streak}
+            roundCount={currentPlan.roundCount}
+          />
         </div>
       )}
 

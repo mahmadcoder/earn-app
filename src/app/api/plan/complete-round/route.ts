@@ -116,6 +116,32 @@ export const POST = requireAuth(async (req: AuthRequest) => {
         canWithdraw: true, // Always set to true after completing a round
       },
     });
+    // Update user's daily streak in User table
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    let newStreak = 1;
+    if (user?.lastStreakDate) {
+      const lastStreakDate = new Date(user.lastStreakDate);
+      const lastStreakDateStr = lastStreakDate.toISOString().slice(0, 10);
+      const todayStr = now.toISOString().slice(0, 10);
+      const diffDays = Math.floor(
+        (new Date(todayStr).getTime() - new Date(lastStreakDateStr).getTime()) /
+          (1000 * 60 * 60 * 24)
+      );
+      if (lastStreakDateStr === todayStr) {
+        newStreak = user.dailyStreak || 1;
+      } else if (diffDays === 1) {
+        newStreak = (user.dailyStreak || 0) + 1;
+      } else {
+        newStreak = 1;
+      }
+    }
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        dailyStreak: newStreak,
+        lastStreakDate: now,
+      },
+    });
     console.log("[COMPLETE ROUND API] Updated progress:", updatedProgress);
     // Calculate total profit for all plans for this user
     const allProgresses = await prisma.userPlanProgress.findMany({

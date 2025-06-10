@@ -3,6 +3,7 @@ import Image from "next/image";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import StreakProgressBar from "./StreakProgressBar";
 
 export default function AccountsPage() {
   const router = useRouter();
@@ -13,6 +14,8 @@ export default function AccountsPage() {
   const [showRejectedModal, setShowRejectedModal] = useState(false);
   const [canStartTask, setCanStartTask] = useState(true);
   const [timer, setTimer] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [roundCount, setRoundCount] = useState(0);
 
   // Fetch deposit status for the user
   useEffect(() => {
@@ -78,10 +81,18 @@ export default function AccountsPage() {
             const nowDate = now.toISOString().slice(0, 10);
             const lastRoundDateStr = lastRound.toISOString().slice(0, 10);
             if (nowDate === lastRoundDateStr) {
-              // Calculate ms left until next UTC day
-              const nextDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+              // Calculate ms left until next LOCAL day (local midnight)
+              const nextLocalMidnight = new Date(
+                now.getFullYear(),
+                now.getMonth(),
+                now.getDate() + 1,
+                0,
+                0,
+                0,
+                0
+              );
               setCanStartTask(false);
-              setTimer(nextDay.getTime() - now.getTime());
+              setTimer(nextLocalMidnight.getTime() - now.getTime());
             } else {
               setCanStartTask(true);
               setTimer(0);
@@ -90,10 +101,13 @@ export default function AccountsPage() {
             setCanStartTask(true);
             setTimer(0);
           }
+          setRoundCount(data.progresses[0].roundCount || 0);
         } else {
           setCanStartTask(true);
           setTimer(0);
         }
+        // Set backend-driven streak
+        setStreak(data.dailyStreak || 0);
       } catch {
         setCanStartTask(true);
         setTimer(0);
@@ -119,6 +133,12 @@ export default function AccountsPage() {
         <h1 className="text-4xl font-bold text-center text-white mb-8">
           Crypto Wallet Account
         </h1>
+        {/* Streak & Progress Bar */}
+        <div className="flex justify-center mb-8">
+          <div className="w-full max-w-md">
+            <StreakProgressBar streak={streak} roundCount={roundCount} />
+          </div>
+        </div>
         <p className="text-center text-white max-w-3xl mx-auto mb-12">
           Securely manage your cryptocurrency with Binance. Fast, reliable, and
           global.
